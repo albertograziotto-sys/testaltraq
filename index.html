@@ -1028,7 +1028,33 @@
         document.getElementById('cart-badge').innerText = numeroPezzi;
     }
 
-  // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET E PRODOTTI
+    // --- NUOVE FUNZIONI PER GESTIRE LE MODIFICHE DIRETTAMENTE DAL CARRELLO ---
+    function modificaQtaDalCarrello(codice, idBottega, delta) {
+        const index = AppState.carrello.findIndex(i => i.codice_articolo === codice && i.id_bottega == idBottega);
+        if (index > -1) {
+            let nuovaQta = AppState.carrello[index].quantita + delta;
+            if (nuovaQta <= 0) {
+                AppState.carrello.splice(index, 1);
+            } else {
+                AppState.carrello[index].quantita = nuovaQta;
+            }
+            salvaCarrelloInBozza();
+            aggiornaBarraStickyCarrello();
+            mostraRiepilogoCarrello(); // Ricarica la vista istantaneamente
+        }
+    }
+
+    function rimuoviDalCarrello(codice, idBottega) {
+        const index = AppState.carrello.findIndex(i => i.codice_articolo === codice && i.id_bottega == idBottega);
+        if (index > -1) {
+            AppState.carrello.splice(index, 1);
+            salvaCarrelloInBozza();
+            aggiornaBarraStickyCarrello();
+            mostraRiepilogoCarrello(); // Ricarica la vista istantaneamente
+        }
+    }
+
+    // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET E PRODOTTI MODIFICABILI
     function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
@@ -1070,21 +1096,19 @@
         let html = `
         <div class="full-page-card border-top-0 w-100" style="border-top: 6px solid var(--brand) !important;">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 flex-wrap">
-                <h3 class="fw-bold text-brand m-0">Logistica e Spedizioni</h3>
+                <h3 class="fw-bold text-brand m-0">Logistica e Carrello</h3>
                 <button class="btn btn-outline-secondary btn-sm fw-bold mt-2 mt-md-0" onclick="navigaA('app-section'); caricaCampagne();">← Torna ai Preordini</button>
             </div>
             
             ${avvisiBudgetHtml}
             
-            <p class="text-muted">Il sistema ha analizzato i tuoi ordini e raggruppato le spedizioni in base ai minimi richiesti. Visualizza il dettaglio degli articoli ordinati per sede.</p>
+            <p class="text-muted">Analizza i tuoi ordini e raggruppa le spedizioni in base ai minimi. Puoi aggiustare le quantità qui sotto se ti manca poco per raggiungere una soglia.</p>
         `;
 
         let tuttoSuperato = true;
 
         categorieNelCarrello.forEach(idCat => {
             const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || {nome_categoria: 'Sconosciuta', minimo_ordine: 0};
-            
-            // FIX BUG COMPARAZIONE: Forziamo la conversione in numero
             const minOrdineInfo = Number(infoCat.minimo_ordine) || 0; 
             
             const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
@@ -1105,10 +1129,9 @@
                 <div class="card-body p-4">`;
 
             if(!minimoSuperato) {
-                html += `<div class="alert alert-danger fw-bold shadow-sm mb-4">❌ Per questa categoria non hai raggiunto il minimo d'ordine globale. Torna indietro e aggiungi articoli per poter procedere.</div>`;
+                html += `<div class="alert alert-danger fw-bold shadow-sm mb-4">❌ Non hai raggiunto il minimo d'ordine globale. Aggiusta le quantità qui sotto o torna ai preordini per procedere.</div>`;
             }
 
-            // Calcolo la spesa per bottega (mostro i prodotti anche se il minimo non è raggiunto)
             let spesaPerBottega = {};
             vociCat.forEach(v => {
                 if(!spesaPerBottega[v.id_bottega]) spesaPerBottega[v.id_bottega] = 0;
@@ -1121,7 +1144,6 @@
 
             for (let idBottega in spesaPerBottega) {
                 const spesaSede = Number(spesaPerBottega[idBottega]);
-                // FIX BUG COMPARAZIONE: Utilizzo i valori forzati come Numeri
                 if(spesaSede >= minOrdineInfo) {
                     autonome.push({id: idBottega, totale: spesaSede});
                 } else {
@@ -1130,12 +1152,30 @@
                 }
             }
 
-            // Funzione di supporto per generare la lista di HTML dei prodotti di una sede
-            const generaListaProdotti = (idSede) => {
+            // FUNZIONE DI SUPPORTO: Genera i prodotti con i pulsanti + e -
+            const generaListaProdottiModificabile = (idSede) => {
                 const items = vociCat.filter(i => i.id_bottega == idSede);
-                let listaHtml = `<div class="mt-3 p-2 bg-white rounded border border-secondary-subtle small"><strong class="text-dark d-block mb-2 border-bottom pb-1">Dettaglio Articoli:</strong><ul class="list-unstyled mb-0">`;
+                let listaHtml = `<div class="mt-3 p-2 bg-white rounded border border-secondary-subtle small"><strong class="text-dark d-block mb-2 border-bottom pb-1">Gestisci Articoli Sede:</strong><ul class="list-unstyled mb-0">`;
+                
                 items.forEach(item => {
-                    listaHtml += `<li class="mb-1 pb-1 border-bottom border-light"><span class="text-muted fw-bold">${item.quantita}x</span> ${item.nome_produttore} - ${item.nome} <span class="float-end fw-semibold">€ ${(item.quantita * item.prezzo).toFixed(2).replace('.',',')}</span></li>`;
+                    const subtotale = (item.quantita * item.prezzo).toFixed(2).replace('.',',');
+                    
+                    listaHtml += `
+                    <li class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="text-truncate" style="flex: 1 1 200px; min-width: 0;">
+                            <span class="badge bg-dark me-1">${item.nome_produttore}</span><br class="d-md-none">
+                            <span class="text-dark">${item.nome}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="fw-bold text-brand d-none d-sm-block">€ ${subtotale}</span>
+                            <div class="input-group input-group-sm" style="width: 90px; flex-wrap: nowrap;">
+                                <button class="btn btn-outline-secondary px-2 fw-bold" type="button" onclick="modificaQtaDalCarrello('${item.codice_articolo}', ${idSede}, -1)">-</button>
+                                <input type="number" class="form-control text-center p-0 fw-bold bg-white" value="${item.quantita}" readonly>
+                                <button class="btn btn-outline-secondary px-2 fw-bold" type="button" onclick="modificaQtaDalCarrello('${item.codice_articolo}', ${idSede}, 1)">+</button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="rimuoviDalCarrello('${item.codice_articolo}', ${idSede})" title="Rimuovi">🗑️</button>
+                        </div>
+                    </li>`;
                 });
                 listaHtml += `</ul></div>`;
                 return listaHtml;
@@ -1152,10 +1192,10 @@
                     const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega || 'Sconosciuta';
                     html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-3">
                         <div class="d-flex justify-content-between align-items-center w-100">
-                            <span><strong class="text-dark">${nomeB}</strong><br><small class="text-muted">Raggiunge il minimo da sola. Spedizione diretta.</small></span>
+                            <span><strong class="text-dark">${nomeB}</strong><br><small class="text-muted">Raggiunge il minimo. Spedizione diretta.</small></span>
                             <span class="fw-bold text-success fs-5">€ ${a.totale.toFixed(2).replace('.',',')}</span>
                         </div>
-                        ${generaListaProdotti(a.id)}
+                        ${generaListaProdottiModificabile(a.id)}
                     </li>`;
                 });
                 html += `</ul></div></div>`;
@@ -1173,7 +1213,7 @@
                             <span class="text-dark fw-bold">${nomeB}</span>
                             <span class="text-muted fw-bold fs-6">€ ${r.totale.toFixed(2).replace('.',',')}</span>
                         </div>
-                        ${generaListaProdotti(r.id)}
+                        ${generaListaProdottiModificabile(r.id)}
                     </li>`;
                 });
                 html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between border-top mt-2 pt-3 bg-light rounded">
@@ -1181,7 +1221,6 @@
                     <strong class="text-brand fs-5 me-2">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
                 </li></ul>`;
 
-                // Chiediamo dove spedire SOLO se il minimo è superato (altrimenti non possono inviare l'ordine)
                 if(minimoSuperato) {
                     html += `<div class="p-3 bg-light border border-secondary-subtle rounded mt-3">
                         <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
