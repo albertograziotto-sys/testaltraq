@@ -293,7 +293,7 @@
           </div>
         </div>
         <div class="bg-white p-4 border-top text-start text-dark" style="border-radius: 0 0 12px 12px;" id="modal-product-details">
-           <!-- Compilato dinamicamente via Javascript -->
+            <!-- Compilato dinamicamente via Javascript -->
         </div>
       </div>
     </div>
@@ -780,7 +780,7 @@
                 <div class="card shadow-sm h-100">
                     <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${p.id_produttore}, '${safeNomeProduttore}', ${p.pvp}, '${safeDesc}')">
                         <img src="${imgUrl}" 
-                             onerror="this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.';" 
+                             onerror="if(!this.dataset.fallback){this.dataset.fallback=true; this.src='${SUPABASE_URL}/storage/v1/object/public/foto/${cod} (1).webp';}else{this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.';}" 
                              style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" 
                              onmouseover="this.style.transform='scale(1.05)'" 
                              onmouseout="this.style.transform='scale(1)'">
