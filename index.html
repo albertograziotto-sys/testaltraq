@@ -634,7 +634,7 @@
         app.innerHTML = html;
     }
 
-    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO AGGIORNATA CON POP-UP (MODALE)
+    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO AGGIORNATA CON SUPPORTO .jpg / .JPG
     async function apriCatalogoProduttore(idProduttore, nomeProduttore, nomeCategoria, idCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
         
@@ -659,6 +659,8 @@
         prodotti.forEach(p => {
             const cod = p.codice_articolo;
             const safeNome = p.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            
+            // Generiamo l'URL base usando .jpg di default
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.jpg`;
             
             const itemInCart = AppState.carrello.find(i => i.codice_articolo === cod && i.id_bottega == AppState.bottegaAttivaId);
@@ -668,7 +670,14 @@
             <div class="col-xl-3 col-lg-4 col-sm-6 product-card text-start mb-4">
                 <div class="card shadow-sm h-100">
                     <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}')">
-                        <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.'" style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        
+                        <!-- Gestione intelligente onerror: se fallisce .jpg, prova .JPG. Se fallisce anche quello, mostra il placeholder -->
+                        <img src="${imgUrl}" 
+                             onerror="if(!this.dataset.triedJPG){ this.dataset.triedJPG=true; this.src='${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.JPG'; } else { this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.'; }" 
+                             style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" 
+                             onmouseover="this.style.transform='scale(1.05)'" 
+                             onmouseout="this.style.transform='scale(1)'">
+                        
                         <span class="badge bg-dark text-white position-absolute top-0 start-0 m-2 opacity-75">${nomeProduttore}</span>
                         <div class="position-absolute bottom-0 end-0 m-2 text-brand bg-white rounded-circle shadow-sm" style="padding: 4px 8px; opacity: 0.9;">🔍</div>
                     </div>
@@ -707,7 +716,7 @@
         document.getElementById('cart-sticky-bar').style.display = 'flex';
     }
 
-    // FUNZIONE GALLERIA FOTOGRAFICA
+    // FUNZIONE GALLERIA FOTOGRAFICA AGGIORNATA CON SUPPORTO .jpg / .JPG
     function apriGalleria(codice, nome) {
         document.getElementById('galleryModalLabel').innerText = nome;
         const carouselInner = document.getElementById('carousel-inner-content');
@@ -718,9 +727,15 @@
 
         estensioni.forEach((ext, i) => {
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.jpg`;
+            const imgUrlJPG = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.JPG`;
+            
             html += `
             <div class="carousel-item ${i === 0 ? 'active' : ''} p-3">
-                <img src="${imgUrl}" class="d-block mx-auto" style="height: 60vh; max-width: 100%; object-fit: contain;" onerror="this.parentElement.remove();">
+                <!-- Prova .jpg, se fallisce prova .JPG, se fallisce anche quello rimuove il container -->
+                <img src="${imgUrl}" 
+                     class="d-block mx-auto" 
+                     style="height: 60vh; max-width: 100%; object-fit: contain;" 
+                     onerror="if(!this.dataset.triedJPG){ this.dataset.triedJPG=true; this.src='${imgUrlJPG}'; } else { this.parentElement.remove(); }">
             </div>`;
         });
 
