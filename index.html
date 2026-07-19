@@ -95,7 +95,6 @@
   </div>
 
   <div id="register-section" class="center-screen" style="display: none; padding-top: 40px; padding-bottom: 40px;">
-    <!-- Registrazione uguale a prima -->
     <div class="auth-card text-center">
       <h4 class="mb-4 fw-bold text-brand">Nuovo Account B2B</h4>
       <div class="mb-3 text-start"><label class="form-label text-muted small fw-bold">Ragione Sociale</label><input type="text" id="reg-ragionesociale" class="form-control"></div>
@@ -116,7 +115,6 @@
   </div>
 
   <div id="forgot-password-section" class="center-screen" style="display: none;">
-    <!-- Recupero psw uguale a prima -->
     <div class="auth-card text-center">
       <h4 class="mb-3 fw-bold text-brand">Recupero Password</h4>
       <div class="mb-4 text-start"><label class="form-label text-muted small fw-bold">Indirizzo Email</label><input type="email" id="recupero-email" class="form-control"></div>
@@ -156,8 +154,7 @@
           <div class="offcanvas-body d-flex flex-column pt-md-2 p-3 p-md-0">
             <div class="sticky-top" style="top: 20px; width: 100%;">
               <div class="list-group sidebar-menu bg-transparent w-100">
-                <!-- Rinominato da Fornitori a Preordini -->
-                <button class="list-group-item active fw-bold py-3" id="nav-fornitori" onclick="navigaA('app-section')">🌍 Vetrina Preordini</button>
+                <button class="list-group-item active fw-bold py-3" id="nav-fornitori" onclick="navigaA('app-section'); caricaCampagne();">🌍 Vetrina Preordini</button>
                 <button class="list-group-item text-secondary fw-semibold py-3" id="nav-ordini" onclick="navigaA('orders-section')">📦 I Miei Ordini</button>
                 <button class="list-group-item text-secondary fw-semibold py-3" id="nav-profilo" onclick="navigaA('profile-section')">⚙️ Profilo e Botteghe</button>
                 <hr style="opacity: 0.1;">
@@ -181,7 +178,7 @@
 
         <!-- SEZIONE 2: STORICO ORDINI -->
         <div id="orders-section" style="display: none;">
-          <div class="full-page-card border-top-0 w-100" style="max-width: 100%; border-top: 6px solid var(--brand) !important;">
+          <div class="full-page-card border-top-0 w-100" style="max-width: 100%;">
             <h3 class="mb-4 fw-bold text-brand">Storico Ordini</h3>
             <div id="orders-list-container"></div>
           </div>
@@ -194,7 +191,7 @@
 
         <!-- SEZIONE 4: PROFILO E BOTTEGHE -->
         <div id="profile-section" style="display: none;">
-          <div class="full-page-card border-top-0" style="max-width: 800px; border-top: 6px solid var(--brand) !important; margin: 0;">
+          <div class="full-page-card border-top-0" style="max-width: 800px; margin: 0;">
             <h3 class="mb-1 fw-bold text-brand">Il Tuo Profilo</h3>
             <p class="text-muted small mb-4">Gestisci i tuoi dati aziendali e le tue botteghe.</p>
             
@@ -238,7 +235,9 @@
     </button>
   </div>
 
-  <!-- MODALI -->
+  <!-- ==================== MODALI (POP-UP) ==================== -->
+  
+  <!-- Modale Successo -->
   <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg" style="border-top: 6px solid var(--brand) !important;">
@@ -251,9 +250,37 @@
     </div>
   </div>
 
+  <!-- Modale Galleria Foto -->
+  <div class="modal fade" id="galleryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content border-0 shadow-lg" style="background-color: transparent;">
+        <div class="modal-header border-0 pb-0 bg-white" style="border-radius: 12px 12px 0 0;">
+          <h5 class="modal-title fw-bold text-brand" id="galleryModalLabel">Nome Prodotto</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body text-center p-0 bg-dark position-relative" style="border-radius: 0 0 12px 12px; overflow: hidden;">
+          <div id="productCarousel" class="carousel slide" data-bs-ride="carousel">
+            <div class="carousel-inner bg-white" id="carousel-inner-content">
+              <!-- Le immagini si caricheranno qui dinamicamente -->
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#productCarousel" data-bs-slide="prev" style="filter: invert(1) grayscale(100); width: 10%;">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+              <span class="visually-hidden">Precedente</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#productCarousel" data-bs-slide="next" style="filter: invert(1) grayscale(100); width: 10%;">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+              <span class="visually-hidden">Successivo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ==================== LOGICA JAVASCRIPT ==================== -->
   <script>
-    // CHIAVI ALTRAQUALITA' RECUPERATE
+    // CHIAVI ALTRAQUALITA' (Recuperate e corrette)
     const SUPABASE_URL = 'https://tmaxqbosibkxrghgwfzi.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
     const clientDB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -262,8 +289,8 @@
         user: null,
         botteghe: [],
         bottegaAttivaId: null,
-        categorieCache: [], // Mantiene memoria dei minimi d'ordine per il carrello
-        carrello: [] // Formato piatto: Array di {codice_articolo, id_bottega, id_categoria, id_produttore, nome, pvp, prezzo, quantita}
+        categorieCache: [], 
+        carrello: [] 
     };
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -304,7 +331,6 @@
 
       if(sezione === 'app-section') {
           document.getElementById('nav-fornitori').classList.add('active', 'fw-bold');
-          caricaCampagne(); // Ricarica sempre partendo dal livello 1
       }
       if(sezione === 'orders-section') {
           document.getElementById('nav-ordini').classList.add('active', 'fw-bold');
@@ -326,10 +352,54 @@
       field.type = field.type === "password" ? "text" : "password";
     }
 
-    /* === LOGIN E AUTH (invariato) === */
-    async function eseguiRegistrazione() { /* ... codice invariato ... */ }
-    async function eseguiRecuperoPassword() { /* ... codice invariato ... */ }
-    async function salvaNuovaPassword() { /* ... codice invariato ... */ }
+    /* === LOGIN E AUTH === */
+    async function eseguiRegistrazione() {
+      const ragSoc = document.getElementById('reg-ragionesociale').value.trim();
+      const piva = document.getElementById('reg-piva').value.trim();
+      const tel = document.getElementById('reg-telefono').value.trim();
+      const email = document.getElementById('reg-email').value.trim().toLowerCase();
+      const psw = document.getElementById('reg-password').value.trim();
+      const btn = document.getElementById('btn-register');
+
+      if(!ragSoc || !email || !psw) return alert("Compila Ragione Sociale, Email e Password!");
+      if(psw.length < 6) return alert("La password deve avere almeno 6 caratteri.");
+      
+      btn.innerText = "Creazione in corso..."; btn.disabled = true;
+
+      const { data: authData, error: authError } = await clientDB.auth.signUp({ email: email, password: psw });
+      if (authError) { alert("Errore registrazione: " + authError.message); btn.innerText = "Crea Account Sicuro"; btn.disabled = false; return; }
+
+      const userId = authData.user.id;
+      const { error: dbError } = await clientDB.from('clienti').insert([{ id: userId, email: email, password: psw, ragione_sociale: ragSoc, partita_iva: piva, telefono: tel }]);
+
+      if (dbError) alert("Account creato ma anagrafica non salvata: " + dbError.message);
+      else {
+          document.getElementById('success-modal-msg').innerHTML = "Ti abbiamo inviato un'email a <b>" + email + "</b>. Clicca sul link all'interno per confermare l'account.";
+          new bootstrap.Modal(document.getElementById('successModal')).show();
+          document.getElementById('successModal').addEventListener('hidden.bs.modal', function () {
+              cambiaVista('login-section'); document.getElementById('login-email').value = email;
+          }, { once: true });
+      }
+      btn.innerText = "Crea Account Sicuro"; btn.disabled = false;
+    }
+
+    async function eseguiRecuperoPassword() {
+        const email = document.getElementById('recupero-email').value.trim().toLowerCase();
+        if(!email) return alert("Inserisci l'email.");
+        const { error } = await clientDB.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+        if (error) alert("Errore: " + error.message); else alert("Email inviata!");
+    }
+
+    async function salvaNuovaPassword() {
+        const psw = document.getElementById('prof-nuova-psw').value.trim();
+        if(psw.length < 6) return alert("Minimo 6 caratteri.");
+        const { error } = await clientDB.auth.updateUser({ password: psw });
+        if (error) alert("Errore: " + error.message); 
+        else { 
+            await clientDB.from('clienti').update({ password: psw }).eq('id', AppState.user.id);
+            alert("Password aggiornata!"); document.getElementById('prof-nuova-psw').value = ''; 
+        }
+    }
 
     async function eseguiLogin() {
       const email = document.getElementById('login-email').value.trim().toLowerCase();
@@ -373,12 +443,25 @@
         let { data: botteghe, error } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
         if (error) return console.error(error);
 
+        if (!botteghe || botteghe.length === 0) {
+            // Se l'utente non ha botteghe, ne creiamo alcune di test
+            const bottegheTest = [
+                { id_cliente: AppState.user.id, nome_bottega: 'Angoli di Mondo', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Acli San Gaetano', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Unicomondo', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Pace e Sviluppo', indirizzo: '' }
+            ];
+            await clientDB.from('botteghe').insert(bottegheTest);
+            let { data: bNew } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
+            botteghe = bNew;
+        }
+
         AppState.botteghe = botteghe || [];
         popolaSelettoreBotteghe();
         disegnaBottegheProfilo();
         
-        // Partiamo caricando la gerarchia dal livello 1
-        caricaCampagne();
+        caricaCampagne(); // Partiamo caricando la gerarchia
     }
 
     function popolaSelettoreBotteghe() {
@@ -401,15 +484,42 @@
         }
     }
 
-    function disegnaBottegheProfilo() { /* ... codice invariato ... */ }
-    async function salvaModificaBottega(idBottega) { /* ... codice invariato ... */ }
+    function disegnaBottegheProfilo() {
+        const container = document.getElementById('botteghe-list-container');
+        let html = '';
+        AppState.botteghe.forEach(b => {
+            html += `
+            <div class="bg-light p-3 rounded mb-3 border border-secondary-subtle">
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
+                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
+                    <div class="col-md-2 text-end"><button class="btn btn-outline-brand w-100 fw-bold shadow-sm" onclick="salvaModificaBottega(${b.id_bottega})">Salva</button></div>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
 
+    async function salvaModificaBottega(idBottega) {
+        const nNome = document.getElementById(`edit-nome-${idBottega}`).value.trim();
+        const nInd = document.getElementById(`edit-ind-${idBottega}`).value.trim();
+        if (!nNome) return alert("Il nome non può essere vuoto.");
+        const { error } = await clientDB.from('botteghe').update({ nome_bottega: nNome, indirizzo: nInd }).eq('id_bottega', idBottega);
+        if (error) alert("Errore: " + error.message);
+        else {
+            const b = AppState.botteghe.find(x => x.id_bottega === idBottega);
+            if (b) { b.nome_bottega = nNome; b.indirizzo = nInd; }
+            popolaSelettoreBotteghe();
+            document.getElementById('success-modal-msg').innerText = "Bottega aggiornata con successo.";
+            new bootstrap.Modal(document.getElementById('successModal')).show();
+        }
+    }
 
     /* ==========================================
        NAVIGAZIONE A 4 LIVELLI
        ========================================== */
 
-    // LIVELLO 1: CAMPAGNE
+    // 1. CAMPAGNE
     async function caricaCampagne() {
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-3 fw-bold">Caricamento preordini attivi...</p>';
@@ -427,7 +537,7 @@
             html += `
             <div class="col-12 mb-4 text-start">
                 <div class="card shadow-sm border-0 bg-dark text-white overflow-hidden" style="border-radius: 15px; cursor: pointer; transition: transform 0.2s;" onclick="apriCampagna(${c.id_campagna}, '${c.nome_campagna}')" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
-                    <div class="card-body p-5 d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, var(--brand) 0%, #4a1525 100%); min-height: 160px;">
+                    <div class="card-body p-5 d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, var(--brand) 0%, #a43800 100%); min-height: 160px;">
                         <h3 class="card-title fw-bold mb-2">📦 ${c.nome_campagna}</h3>
                         <p class="card-text opacity-75">Clicca per entrare e visualizzare le categorie di prodotto.</p>
                     </div>
@@ -437,9 +547,10 @@
         
         app.innerHTML = html;
         aggiornaBarraStickyCarrello();
+        document.getElementById('cart-sticky-bar').style.display = 'flex';
     }
 
-    // LIVELLO 2: CATEGORIE
+    // 2. CATEGORIE
     async function apriCampagna(idCampagna, nomeCampagna) {
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div>';
@@ -470,11 +581,11 @@
                 <div class="card shadow-sm h-100 border-0 p-3" style="cursor: pointer; transition: transform 0.2s;" onclick="apriCategoria(${cat.id_categoria}, '${cat.nome_categoria.replace("'", "\\'")}', ${cat.minimo_ordine}, ${idCampagna}, '${nomeCampagna.replace("'", "\\'")}')" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
                     <div class="card-body d-flex flex-column">
                         <h4 class="fw-bold text-dark mb-2">📁 ${cat.nome_categoria}</h4>
-                        <p class="text-muted small mb-3">Minimo di rete: <strong>€ ${cat.minimo_ordine.toFixed(2)}</strong></p>
+                        <p class="text-muted small mb-3">Minimo organizzazione: <strong>€ ${cat.minimo_ordine.toFixed(2).replace('.',',')}</strong></p>
                         <div class="mt-auto">
                             <div class="d-flex justify-content-between small fw-bold mb-1">
-                                <span>Progresso Ordine:</span>
-                                <span>€ ${totCategoria.toFixed(2)} / € ${cat.minimo_ordine.toFixed(2)}</span>
+                                <span>Progresso (tutte le botteghe):</span>
+                                <span>€ ${totCategoria.toFixed(2).replace('.',',')} / € ${cat.minimo_ordine.toFixed(2).replace('.',',')}</span>
                             </div>
                             <div class="progress" style="height: 12px; border-radius: 10px;">
                                 <div class="progress-bar ${coloreBarra} progress-bar-striped progress-bar-animated" style="width: ${perc}%;"></div>
@@ -487,7 +598,7 @@
         app.innerHTML = html;
     }
 
-    // LIVELLO 3: PRODUTTORI
+    // 3. PRODUTTORI
     async function apriCategoria(idCategoria, nomeCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div>';
@@ -503,7 +614,7 @@
                 <div class="p-2 bg-light rounded border mt-2 mt-md-0">
                     <span class="small text-muted fw-bold d-block">Stato Minimo:</span>
                     <span class="badge ${calcolaTotaleCarrelloPerCategoria(idCategoria) >= minimoOrdine ? 'bg-success' : 'bg-warning text-dark'} fs-6">
-                        € ${calcolaTotaleCarrelloPerCategoria(idCategoria).toFixed(2)} / € ${minimoOrdine.toFixed(2)}
+                        € ${calcolaTotaleCarrelloPerCategoria(idCategoria).toFixed(2).replace('.',',')} / € ${minimoOrdine.toFixed(2).replace('.',',')}
                     </span>
                 </div>
             </div>
@@ -523,7 +634,7 @@
         app.innerHTML = html;
     }
 
-    // LIVELLO 4: CATALOGO PRODOTTI E GRIGLIA FOTO
+    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO AGGIORNATA CON POP-UP (MODALE)
     async function apriCatalogoProduttore(idProduttore, nomeProduttore, nomeCategoria, idCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
         
@@ -548,22 +659,18 @@
         prodotti.forEach(p => {
             const cod = p.codice_articolo;
             const safeNome = p.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            
-            // Logica delle foto tramite storage Supabase
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.jpg`;
             
-            // Trovo la quantità già nel carrello per questa specifica bottega
             const itemInCart = AppState.carrello.find(i => i.codice_articolo === cod && i.id_bottega == AppState.bottegaAttivaId);
             const qtaAttuale = itemInCart ? itemInCart.quantita : 0;
             
             html += `
             <div class="col-xl-3 col-lg-4 col-sm-6 product-card text-start mb-4">
                 <div class="card shadow-sm h-100">
-                    <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative;">
-                        <!-- Immagine Prodotto -->
-                        <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.'" style="max-height: 100%; max-width: 100%; object-fit: contain;">
-                        <!-- Badge Produttore in alto a sinistra sulla foto -->
+                    <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}')">
+                        <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.'" style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                         <span class="badge bg-dark text-white position-absolute top-0 start-0 m-2 opacity-75">${nomeProduttore}</span>
+                        <div class="position-absolute bottom-0 end-0 m-2 text-brand bg-white rounded-circle shadow-sm" style="padding: 4px 8px; opacity: 0.9;">🔍</div>
                     </div>
                     <div class="card-body d-flex flex-column bg-white border-top p-3">
                         <h6 class="card-title fw-bold text-dark mt-1 mb-1" style="font-size: 0.95rem; line-height: 1.2;" title="${safeNome}">${p.nome}</h6>
@@ -580,7 +687,6 @@
                             </div>
                         </div>
 
-                        <!-- Controlli Quantità -->
                         <div class="d-flex align-items-center">
                             <div class="input-group me-2" style="width: 110px;">
                                 <button class="btn btn-outline-secondary btn-qta px-2" onclick="modificaQtaGriglia('${cod}', -1, '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore}')">-</button>
@@ -601,9 +707,30 @@
         document.getElementById('cart-sticky-bar').style.display = 'flex';
     }
 
+    // FUNZIONE GALLERIA FOTOGRAFICA
+    function apriGalleria(codice, nome) {
+        document.getElementById('galleryModalLabel').innerText = nome;
+        const carouselInner = document.getElementById('carousel-inner-content');
+        carouselInner.innerHTML = ''; 
+
+        const estensioni = ['', ' (1)', ' (2)', ' (3)'];
+        let html = '';
+
+        estensioni.forEach((ext, i) => {
+            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.jpg`;
+            html += `
+            <div class="carousel-item ${i === 0 ? 'active' : ''} p-3">
+                <img src="${imgUrl}" class="d-block mx-auto" style="height: 60vh; max-width: 100%; object-fit: contain;" onerror="this.parentElement.remove();">
+            </div>`;
+        });
+
+        carouselInner.innerHTML = html;
+        new bootstrap.Modal(document.getElementById('galleryModal')).show();
+    }
+
 
     /* ==========================================
-       LOGICA CARRELLO MULTI-LIVELLO
+       LOGICA CARRELLO MULTI-LIVELLO E CHECKOUT
        ========================================== */
 
     function modificaQtaGriglia(codice, delta, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore) {
@@ -611,7 +738,7 @@
         if(!input) return;
         let val = parseInt(input.value) || 0;
         val += delta;
-        if (val < 1) val = 1; // Non andiamo sotto l'1 nel box visivo
+        if (val < 1) val = 1; 
         input.value = val;
     }
 
@@ -620,7 +747,7 @@
         if(!input) return;
         const qta = parseInt(input.value) || 0;
         aggiornaQuantitaCarrelloGlobale(codice, nome, qta, prezzoNetto, idCategoria, idProduttore, nomeProduttore);
-        // Effetto visivo bottone
+        
         const btn = event.currentTarget;
         const originalText = btn.innerText;
         btn.innerText = "✓ Fatto";
@@ -651,7 +778,7 @@
                     id_produttore: idProduttore,
                     nome_produttore: nomeProduttore,
                     quantita: quantita, 
-                    prezzo: prezzoNetto // Uso prezzo per compatibilità
+                    prezzo: prezzoNetto 
                 });
             }
         }
@@ -671,11 +798,8 @@
         document.getElementById('cart-badge').innerText = numeroPezzi;
     }
 
-    /* ==========================================
-       RIEPILOGO E CHECKOUT RAGGRUPPATO
-       ========================================== */
-
-function mostraRiepilogoCarrello() {
+    // CHECKOUT LOGISTICO INTELLIGENTE
+    function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
         
@@ -724,7 +848,6 @@ function mostraRiepilogoCarrello() {
             if(!minimoSuperato) {
                 html += `<div class="alert alert-danger fw-bold shadow-sm mb-0">❌ Per questa categoria non hai raggiunto il minimo d'ordine globale. Torna indietro e aggiungi articoli per poter procedere.</div>`;
             } else {
-                // MOTORE LOGISTICO: Dividiamo tra chi supera il minimo da solo e chi no.
                 let spesaPerBottega = {};
                 vociCat.forEach(v => {
                     if(!spesaPerBottega[v.id_bottega]) spesaPerBottega[v.id_bottega] = 0;
@@ -746,7 +869,6 @@ function mostraRiepilogoCarrello() {
 
                 html += `<div class="row">`;
 
-                // BOX 1: Botteghe Autonome
                 if(autonome.length > 0) {
                     html += `<div class="col-md-6 mb-3">
                         <div class="p-3 bg-white border border-success rounded shadow-sm h-100">
@@ -762,7 +884,6 @@ function mostraRiepilogoCarrello() {
                     html += `</ul></div></div>`;
                 }
 
-                // BOX 2: Botteghe Raggruppate
                 if(raggruppate.length > 0) {
                     html += `<div class="col-md-6 mb-3">
                         <div class="p-3 bg-white border border-warning rounded shadow-sm h-100">
@@ -780,18 +901,15 @@ function mostraRiepilogoCarrello() {
                         <strong class="text-brand">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
                     </li></ul>`;
 
-                    // Selezione destinazione (Il Menù a Tendina)
                     html += `<div class="p-3 bg-light border rounded">
                         <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
                         <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="spedizione-cat-${idCat}">`;
                     
                     if(totRaggruppate >= infoCat.minimo_ordine) {
-                        // Gruppo forte: Scegliamo tra tutte le sedi della rete
                         AppState.botteghe.forEach(b => {
                             html += `<option value="${b.id_bottega}">Spedisci alla sede di: ${b.nome_bottega}</option>`;
                         });
                     } else {
-                        // Gruppo debole: Obbligo di unione a una sede "Autonoma" (Forte)
                         html += `<option value="" disabled selected>Devi unirti a una sede forte...</option>`;
                         autonome.forEach(a => {
                             const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega;
@@ -799,13 +917,13 @@ function mostraRiepilogoCarrello() {
                         });
                     }
                     html += `</select>
-                        <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate per ogni singola bottega.</small>
+                        <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate.</small>
                     </div></div></div>`;
                 }
 
-                html += `</div>`; // chiusura row
+                html += `</div>`; 
             }
-            html += `</div></div>`; // chiusura card
+            html += `</div></div>`; 
         });
 
         const grandTotale = document.getElementById('cart-total-bar').innerText;
@@ -813,7 +931,7 @@ function mostraRiepilogoCarrello() {
         <div class="col-12 text-end mt-4 bg-white p-4 rounded shadow-sm border border-secondary-subtle">
             <h3 class="fw-bold mb-3 text-dark">Totale Generale da confermare: <span class="text-brand">${grandTotale}</span></h3>
             ${tuttoSuperato 
-                ? `<button class="btn btn-success btn-lg fw-bold px-5 shadow-sm" onclick="inviaOrdineDefinitivo()">✅ Conferma e Invia Ordine Ad AltraQualità</button>`
+                ? `<button class="btn btn-success btn-lg fw-bold px-5 shadow-sm" onclick="inviaOrdineDefinitivo()">✅ Conferma e Invia Ordine</button>`
                 : `<button class="btn btn-secondary btn-lg fw-bold px-5" disabled>Raggiungi i minimi per poter inviare</button>
                    <p class="text-danger mt-2 fw-bold small">Attenzione: risolvi le categorie segnate in rosso per procedere.</p>`
             }
@@ -824,11 +942,6 @@ function mostraRiepilogoCarrello() {
 
     async function inviaOrdineDefinitivo() {
         if(!confirm("Confermi di voler inviare l'ordine definitivo a tutti i produttori?")) return;
-
-        // Qui in futuro ci sarà la scrittura sulle tabelle ordini_testata e ordini_dettaglio
-        // raggruppando per bottega o per fornitore come richiesto dal backoffice.
-        // Per ora diamo un fantastico alert di successo!
-
         document.getElementById('success-modal-msg').innerHTML = "Il tuo ordine è stato registrato ed inviato con successo ad <b>AltraQualità</b>!<br>Riceverai a breve un'email di riepilogo.";
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
@@ -838,10 +951,10 @@ function mostraRiepilogoCarrello() {
         caricaCampagne();
     }
 
-    /* STORICO ORDINI (Base) */
+    /* STORICO ORDINI */
     async function caricaStoricoOrdini() {
         const container = document.getElementById('orders-list-container');
-        container.innerHTML = '<p class="text-muted fw-bold mt-4">La funzione storico verrà attivata a breve.</p>';
+        container.innerHTML = '<p class="text-muted fw-bold mt-4">Lo storico ordini verrà mostrato qui.</p>';
     }
   </script>
 </body>
