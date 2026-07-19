@@ -379,6 +379,19 @@
       field.type = field.type === "password" ? "text" : "password";
     }
 
+    /* === GESTIONE FALLBACK IMMAGINI AUTOMATICA === */
+    function gestisciErroreFoto(img, codice) {
+        if (!img.dataset.tentativo) {
+            // Primo errore: proviamo ad aggiungere " (1)" al codice articolo
+            img.dataset.tentativo = "1";
+            img.src = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice} (1).webp`;
+        } else {
+            // Secondo errore: carichiamo un SVG locale leggero, indipendente dalla rete
+            img.onerror = null;
+            img.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%23f8f9fa"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="8" fill="%23adb5bd">Foto non disp.</text></svg>`;
+        }
+    }
+
     /* === LOGIN E AUTH === */
     async function eseguiRegistrazione() {
       const ragSoc = document.getElementById('reg-ragionesociale').value.trim();
@@ -780,7 +793,7 @@
                 <div class="card shadow-sm h-100">
                     <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${p.id_produttore}, '${safeNomeProduttore}', ${p.pvp}, '${safeDesc}')">
                         <img src="${imgUrl}" 
-                             onerror="if(!this.dataset.fallback){this.dataset.fallback=true; this.src='${SUPABASE_URL}/storage/v1/object/public/foto/${cod} (1).webp';}else{this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.';}" 
+                             onerror="gestisciErroreFoto(this, '${cod}')" 
                              style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" 
                              onmouseover="this.style.transform='scale(1.05)'" 
                              onmouseout="this.style.transform='scale(1)'">
@@ -1222,7 +1235,7 @@
                         });
                     }
                     html += `</select>
-                        <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate.</small>
+                        <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Fle distinte cartacee all'interno saranno mantenute separate.</small>
                     </div>`;
                 }
                 html += `</div></div>`;
