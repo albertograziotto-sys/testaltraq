@@ -250,7 +250,7 @@
     </div>
   </div>
 
-  <!-- Modale Galleria Foto -->
+  <!-- Modale Galleria Foto con Descrizione e Carrello Inclusi -->
   <div class="modal fade" id="galleryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content border-0 shadow-lg" style="background-color: transparent;">
@@ -258,7 +258,7 @@
           <h5 class="modal-title fw-bold text-brand" id="galleryModalLabel">Nome Prodotto</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body text-center p-0 bg-dark position-relative" style="border-radius: 0 0 12px 12px; overflow: hidden;">
+        <div class="modal-body text-center p-0 bg-dark position-relative" style="overflow: hidden;">
           <div id="productCarousel" class="carousel slide" data-bs-ride="carousel">
             <div class="carousel-inner bg-white" id="carousel-inner-content">
               <!-- Le immagini si caricheranno qui dinamicamente -->
@@ -272,6 +272,10 @@
               <span class="visually-hidden">Successivo</span>
             </button>
           </div>
+        </div>
+        <!-- Pannello Dettagli, Descrizione e Carrello del Modal -->
+        <div class="bg-white p-4 border-top text-start text-dark" style="border-radius: 0 0 12px 12px;" id="modal-product-details">
+           <!-- Compilato dinamicamente via Javascript -->
         </div>
       </div>
     </div>
@@ -665,6 +669,7 @@
         prodotti.forEach(p => {
             const cod = p.codice_articolo;
             const safeNome = p.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safeDesc = p.descrizione ? p.descrizione.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
             
             // Generiamo l'URL base usando .jpg di default
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.jpg`;
@@ -675,7 +680,7 @@
             html += `
             <div class="col-xl-3 col-lg-4 col-sm-6 product-card text-start mb-4">
                 <div class="card shadow-sm h-100">
-                    <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}')">
+                    <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore.replace(/'/g, "\\'")}', ${p.pvp}, '${safeDesc}')">
                         
                         <!-- Gestione intelligente onerror: se fallisce .jpg, prova .JPG. Se fallisce anche quello, mostra il placeholder -->
                         <img src="${imgUrl}" 
@@ -708,7 +713,7 @@
                                 <input type="number" class="form-control text-center fw-bold p-0" value="${qtaAttuale > 0 ? qtaAttuale : 1}" min="1" id="qty_${cod}">
                                 <button class="btn btn-outline-secondary btn-qta px-2" onclick="modificaQtaGriglia('${cod}', 1, '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore}')">+</button>
                             </div>
-                            <button class="btn btn-brand flex-grow-1 px-1 fw-bold shadow-sm" onclick="applicaQtaDalBottone('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore}')">
+                            <button id="btn_grid_${cod}" class="btn btn-brand flex-grow-1 px-1 fw-bold shadow-sm" onclick="applicaQtaDalBottone('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore}')">
                                 ${qtaAttuale > 0 ? 'Aggiorna' : 'Aggiungi'}
                             </button>
                         </div>
@@ -722,8 +727,8 @@
         document.getElementById('cart-sticky-bar').style.display = 'flex';
     }
 
-    // FUNZIONE GALLERIA FOTOGRAFICA AGGIORNATA CON SUPPORTO .jpg / .JPG
-    function apriGalleria(codice, nome) {
+    // FUNZIONE GALLERIA FOTOGRAFICA AGGIORNATA CON SUPPORTO .jpg / .JPG, CARRELLO E DESCRIZIONE
+    function apriGalleria(codice, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore, pvp, descrizione) {
         document.getElementById('galleryModalLabel').innerText = nome;
         const carouselInner = document.getElementById('carousel-inner-content');
         carouselInner.innerHTML = ''; 
@@ -740,12 +745,52 @@
                 <!-- Prova .jpg, se fallisce prova .JPG, se fallisce anche quello rimuove il container -->
                 <img src="${imgUrl}" 
                      class="d-block mx-auto" 
-                     style="height: 60vh; max-width: 100%; object-fit: contain;" 
+                     style="height: 45vh; max-width: 100%; object-fit: contain;" 
                      onerror="if(!this.dataset.triedJPG){ this.dataset.triedJPG=true; this.src='${imgUrlJPG}'; } else { this.parentElement.remove(); }">
             </div>`;
         });
-
         carouselInner.innerHTML = html;
+
+        // Recuperiamo lo stato del carrello per impostare la quantità corretta nel modal
+        const itemInCart = AppState.carrello.find(i => i.codice_articolo === codice && i.id_bottega == AppState.bottegaAttivaId);
+        const qtaAttuale = itemInCart ? itemInCart.quantita : 0;
+
+        // Disegniamo il pannello dei dettagli con la descrizione e il modulo d'acquisto
+        const detailsPanel = document.getElementById('modal-product-details');
+        detailsPanel.innerHTML = `
+            <div class="row m-0 w-100">
+                <div class="col-md-7 p-0 pe-md-3 mb-3 mb-md-0">
+                    <h6 class="fw-bold text-brand mb-1">Descrizione Prodotto</h6>
+                    <p class="text-secondary small mb-3" style="line-height:1.4;">${descrizione || 'Nessuna descrizione aggiuntiva inserita per questo articolo.'}</p>
+                    <div class="d-flex gap-2">
+                        <span class="badge bg-light text-muted border px-2 py-1 small">Cod: ${codice}</span>
+                        <span class="badge bg-dark text-white border px-2 py-1 small">${nomeProduttore}</span>
+                    </div>
+                </div>
+                <div class="col-md-5 bg-light p-3 rounded border">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">PVP Pubblico:</span>
+                        <span class="text-secondary small fw-bold">€ ${pvp ? pvp.toFixed(2).replace('.', ',') : '0,00'}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center border-top pt-2 mb-3">
+                        <span class="text-dark fw-bold small">Costo Netto:</span>
+                        <h4 class="text-brand fw-bold mb-0">€ ${prezzoNetto.toFixed(2).replace('.', ',')}</h4>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="input-group me-2" style="width: 110px;">
+                            <button class="btn btn-outline-secondary fw-bold px-2 py-1" style="font-size:0.9rem;" onclick="modificaQtaModal(-1)">-</button>
+                            <input type="number" class="form-control text-center fw-bold p-0" value="${qtaAttuale > 0 ? qtaAttuale : 1}" min="1" id="modal-qty">
+                            <button class="btn btn-outline-secondary fw-bold px-2 py-1" style="font-size:0.9rem;" onclick="modificaQtaModal(1)">+</button>
+                        </div>
+                        <button class="btn btn-brand flex-grow-1 fw-bold shadow-sm py-1" style="font-size:0.95rem;" id="modal-add-btn" onclick="applicaQtaDalModal('${codice}', '${nome.replace(/'/g, "\\'")}', ${prezzoNetto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore.replace(/'/g, "\\'")}')">
+                            ${qtaAttuale > 0 ? 'Aggiorna' : 'Aggiungi'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
         new bootstrap.Modal(document.getElementById('galleryModal')).show();
     }
 
@@ -756,6 +801,15 @@
 
     function modificaQtaGriglia(codice, delta, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore) {
         const input = document.getElementById('qty_' + codice);
+        if(!input) return;
+        let val = parseInt(input.value) || 0;
+        val += delta;
+        if (val < 1) val = 1; 
+        input.value = val;
+    }
+
+    function modificaQtaModal(delta) {
+        const input = document.getElementById('modal-qty');
         if(!input) return;
         let val = parseInt(input.value) || 0;
         val += delta;
@@ -776,6 +830,29 @@
             btn.innerText = "Aggiorna"; 
             btn.classList.remove('bg-success', 'border-success'); 
         }, 1000);
+    }
+
+    function applicaQtaDalModal(codice, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore) {
+        const input = document.getElementById('modal-qty');
+        if(!input) return;
+        const qta = parseInt(input.value) || 0;
+        
+        aggiornaQuantitaCarrelloGlobale(codice, nome, qta, prezzoNetto, idCategoria, idProduttore, nomeProduttore);
+        
+        // Allineamento dinamico dei campi della griglia sottostante
+        const gridInput = document.getElementById('qty_' + codice);
+        if(gridInput) gridInput.value = qta;
+        
+        const gridBtn = document.getElementById(`btn_grid_${codice}`);
+        if(gridBtn) gridBtn.innerText = "Aggiorna";
+
+        const btn = document.getElementById('modal-add-btn');
+        btn.innerText = "✓ Carrello Aggiornato";
+        btn.classList.add('bg-success', 'border-success');
+        setTimeout(() => { 
+            btn.innerText = "Aggiorna"; 
+            btn.classList.remove('bg-success', 'border-success'); 
+        }, 1200);
     }
 
     function aggiornaQuantitaCarrelloGlobale(codice, nome, quantita, prezzoNetto, idCategoria, idProduttore, nomeProduttore) {
