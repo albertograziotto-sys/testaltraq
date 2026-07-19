@@ -193,7 +193,7 @@
         <div id="profile-section" style="display: none;">
           <div class="full-page-card border-top-0" style="max-width: 800px; margin: 0;">
             <h3 class="mb-1 fw-bold text-brand">Il Tuo Profilo</h3>
-            <p class="text-muted small mb-4">Gestisci i tuoi dati aziendali e le tue botteghe.</p>
+            <p class="text-muted small mb-4">Gestisci i tuoi dati aziendali, le tue botteghe e i budget per categoria.</p>
             
             <div class="row mb-4">
               <div class="col-md-6 mb-3">
@@ -207,6 +207,25 @@
             </div>
             
             <hr style="opacity: 0.1;">
+            
+            <!-- FORM DI AGGIUNTA NUOVA BOTTEGA -->
+            <h5 class="fw-bold text-dark mt-2 mb-3">➕ Aggiungi Nuova Bottega</h5>
+            <div class="bg-light p-3 rounded mb-4 border border-secondary-subtle shadow-sm">
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-2 mb-md-0">
+                        <label class="text-muted small fw-bold">Nome Bottega</label>
+                        <input type="text" class="form-control" id="new-bottega-nome" placeholder="Es. Sede Centrale Milano">
+                    </div>
+                    <div class="col-md-5 mb-2 mb-md-0">
+                        <label class="text-muted small fw-bold">Indirizzo (Opzionale)</label>
+                        <input type="text" class="form-control text-secondary" id="new-bottega-ind" placeholder="Es. Via Roma 45">
+                    </div>
+                    <div class="col-md-2 text-end">
+                        <button class="btn btn-brand w-100 fw-bold shadow-sm" onclick="aggiungiBottega()">Crea Sede</button>
+                    </div>
+                </div>
+            </div>
+
             <h5 class="fw-bold text-dark mt-4 mb-3">Le Mie Botteghe & Budget Categorie</h5>
             <div id="botteghe-list-container" class="mb-4"></div>
 
@@ -250,7 +269,7 @@
     </div>
   </div>
 
-  <!-- Modale Galleria Foto con Descrizione e Carrello Inclusi -->
+  <!-- Modale Galleria Foto con Descrizione e Carrello Inclusi (.webp) -->
   <div class="modal fade" id="galleryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content border-0 shadow-lg" style="background-color: transparent;">
@@ -261,7 +280,7 @@
         <div class="modal-body text-center p-0 bg-dark position-relative" style="overflow: hidden;">
           <div id="productCarousel" class="carousel slide" data-bs-ride="carousel">
             <div class="carousel-inner bg-white" id="carousel-inner-content">
-              <!-- Le immagini si caricheranno qui dinamicamente -->
+              <!-- Le immagini si caricheranno qui dinamicamente in formato .webp -->
             </div>
             <button class="carousel-control-prev" type="button" data-bs-target="#productCarousel" data-bs-slide="prev" style="filter: invert(1) grayscale(100); width: 10%;">
               <span class="carousel-control-prev-icon" aria-hidden="true"></span>
@@ -292,7 +311,7 @@
         user: null,
         botteghe: [],
         bottegaAttivaId: null,
-        categoriaAttivaId: null, // Tracciamento in tempo reale per i budget
+        categoriaAttivaId: null,
         categorieCache: [], 
         carrello: [] 
     };
@@ -437,7 +456,6 @@
         document.getElementById('prof-ragione').value = AppState.user.ragione_sociale || ''; 
         document.getElementById('prof-email').value = AppState.user.email || '';
         
-        // Carichiamo tutte le categorie preventivamente per mappare i budget nel profilo
         const { data: tutteLeCategorie } = await clientDB.from('categorie').select('*').order('nome_categoria');
         if(tutteLeCategorie) AppState.categorieCache = tutteLeCategorie;
 
@@ -447,7 +465,9 @@
 
     async function caricaBotteghe() {
         const app = document.getElementById('app-container');
-        app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-3 fw-bold">Caricamento botteghe...</p>';
+        if(app.innerHTML.includes('spinner-border')) {
+            app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-3 fw-bold">Caricamento botteghe...</p>';
+        }
 
         let { data: botteghe, error } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
         if (error) return console.error(error);
@@ -455,10 +475,7 @@
         if (!botteghe || botteghe.length === 0) {
             const bottegheTest = [
                 { id_cliente: AppState.user.id, nome_bottega: 'Angoli di Mondo', indirizzo: '', budget: {} },
-                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '', budget: {} },
-                { id_cliente: AppState.user.id, nome_bottega: 'Acli San Gaetano', indirizzo: '', budget: {} },
-                { id_cliente: AppState.user.id, nome_bottega: 'Unicomondo', indirizzo: '', budget: {} },
-                { id_cliente: AppState.user.id, nome_bottega: 'Pace e Sviluppo', indirizzo: '', budget: {} }
+                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '', budget: {} }
             ];
             await clientDB.from('botteghe').insert(bottegheTest);
             let { data: bNew } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
@@ -469,7 +486,16 @@
         popolaSelettoreBotteghe();
         disegnaBottegheProfilo();
         
-        caricaCampagne(); 
+        // Se la bottega precedentemente attiva è stata eliminata o non impostata, assegna la prima disponibile
+        if(!AppState.bottegaAttivaId && AppState.botteghe.length > 0) {
+            AppState.bottegaAttivaId = AppState.botteghe[0].id_bottega;
+            document.getElementById('global-bottega-selector').value = AppState.bottegaAttivaId;
+        }
+
+        const vistaAttuale = document.querySelector('#app-container h2')?.innerText || '';
+        if(vistaAttuale === '' || vistaAttuale.includes('Inizializzazione')) {
+            caricaCampagne(); 
+        }
     }
 
     function popolaSelettoreBotteghe() {
@@ -478,10 +504,6 @@
         AppState.botteghe.forEach(b => html += `<option value="${b.id_bottega}">${b.nome_bottega}</option>`);
         selector.innerHTML = html;
         if(AppState.bottegaAttivaId) selector.value = AppState.bottegaAttivaId;
-        else if (AppState.botteghe.length > 0) {
-            selector.value = AppState.botteghe[0].id_bottega;
-            AppState.bottegaAttivaId = AppState.botteghe[0].id_bottega;
-        }
         aggiornaBarraStickyCarrello();
     }
 
@@ -494,13 +516,50 @@
         }
     }
 
+    /* === CRUD GESTIONE BOTTEGHE DALL'APP === */
+    async function aggiungiBottega() {
+        const nome = document.getElementById('new-bottega-nome').value.trim();
+        const ind = document.getElementById('new-bottega-ind').value.trim();
+        
+        if(!nome) return alert("Inserisci almeno il nome identificativo della bottega.");
+        
+        const { data, error } = await clientDB.from('botteghe').insert([{
+            id_cliente: AppState.user.id,
+            nome_bottega: nome,
+            indirizzo: ind,
+            budget: {}
+        }]);
+        
+        if (error) {
+            alert("Errore inserimento: " + error.message);
+        } else {
+            document.getElementById('new-bottega-nome').value = '';
+            document.getElementById('new-bottega-ind').value = '';
+            alert("Nuova bottega inserita correttamente!");
+            await caricaBotteghe();
+        }
+    }
+
+    async function eliminaBottega(idBottega) {
+        if(!confirm("Sei sicuro di voler eliminare definitivamente questa bottega? Rimuovendo la bottega perderai anche i budget impostati ed il relativo carrello.")) return;
+        
+        const { error } = await clientDB.from('botteghe').delete().eq('id_bottega', idBottega);
+        if (error) {
+            alert("Errore eliminazione: " + error.message);
+        } else {
+            if(AppState.bottegaAttivaId == idBottega) AppState.bottegaAttivaId = null;
+            AppState.carrello = AppState.carrello.filter(i => i.id_bottega != idBottega);
+            alert("Bottega eliminata con successo!");
+            await caricaBotteghe();
+        }
+    }
+
     function disegnaBottegheProfilo() {
         const container = document.getElementById('botteghe-list-container');
         let html = '';
         AppState.botteghe.forEach(b => {
             const budgetMappati = b.budget || {};
             
-            // Generiamo l'interfaccia griglia dei singoli budget per categoria
             let budgetGridHtml = '<div class="mt-3 p-3 bg-white rounded border border-secondary-subtle small"><h6 class="fw-bold text-muted mb-2">Assegna Budget per Categoria d\'Ordine:</h6><div class="row">';
             AppState.categorieCache.forEach(cat => {
                 const valoreBudget = budgetMappati[cat.id_categoria] || 0;
@@ -515,9 +574,10 @@
             html += `
             <div class="bg-light p-3 rounded mb-4 border border-secondary-subtle shadow-sm">
                 <div class="row align-items-end">
-                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
-                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
-                    <div class="col-md-2 text-end"><button class="btn btn-outline-brand w-100 fw-bold shadow-sm" onclick="salvaModificaBottega(${b.id_bottega})">Salva Tutto</button></div>
+                    <div class="col-md-4 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
+                    <div class="col-md-4 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
+                    <div class="col-md-2 mb-2 mb-md-0"><button class="btn btn-outline-brand w-100 fw-bold shadow-sm" onclick="salvaModificaBottega(${b.id_bottega})">Salva Tutto</button></div>
+                    <div class="col-md-2 mb-2 mb-md-0"><button class="btn btn-outline-danger w-100 fw-bold shadow-sm" onclick="eliminaBottega(${b.id_bottega})">Elimina</button></div>
                 </div>
                 ${budgetGridHtml}
             </div>`;
@@ -529,9 +589,8 @@
         const nNome = document.getElementById(`edit-nome-${idBottega}`).value.trim();
         const nInd = document.getElementById(`edit-ind-${idBottega}`).value.trim();
         
-        if (!nNome) return alert("Il nome non può essere vuoto.");
+        if (!nNome) return alert("Il nome della bottega non può essere vuoto.");
 
-        // Ricostruiamo la mappa dei budget estratti dai campi di input dell'app
         const mappaBudget = {};
         document.querySelectorAll(`.budget-input-${idBottega}`).forEach(input => {
             const catId = input.getAttribute('data-cat-id');
@@ -545,7 +604,7 @@
             const b = AppState.botteghe.find(x => x.id_bottega === idBottega);
             if (b) { b.nome_bottega = nNome; b.indirizzo = nInd; b.budget = mappaBudget; }
             popolaSelettoreBotteghe();
-            document.getElementById('success-modal-msg').innerText = "Anagrafica bottega e budget per categorie aggiornati con successo nell'app.";
+            document.getElementById('success-modal-msg').innerText = "Anagrafica bottega e budget salvati correttamente nell'applicazione.";
             new bootstrap.Modal(document.getElementById('successModal')).show();
         }
     }
@@ -556,7 +615,7 @@
 
     // 1. CAMPAGNE
     async function caricaCampagne() {
-        AppState.categoriaAttivaId = null; // Resetta il focus di categoria
+        AppState.categoriaAttivaId = null;
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-3 fw-bold">Caricamento preordini attivi...</p>';
         
@@ -595,12 +654,6 @@
         const { data: categorie, error } = await clientDB.from('categorie').select('*').eq('id_campagna', idCampagna).order('nome_categoria');
         if (error) { app.innerHTML = `<p class="text-danger fw-bold">Errore: ${error.message}</p>`; return; }
         
-        categorie.forEach(c => {
-            if(!AppState.categorieCache.find(cat => cat.id_categoria === c.id_categoria)){
-                AppState.categorieCache.push(c);
-            }
-        });
-
         let html = `
         <div class="col-12 mb-4 text-start">
             <button class="btn btn-outline-secondary btn-sm mb-3 fw-bold" onclick="caricaCampagne()">← Torna ai Preordini</button>
@@ -638,7 +691,7 @@
 
     // 3. PRODUTTORI
     async function apriCategoria(idCategoria, nomeCategoria, minimoOrdine, idCampagna, nomeCampagna) {
-        AppState.categoriaAttivaId = idCategoria; // Registra la categoria attiva
+        AppState.categoriaAttivaId = idCategoria; 
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div>';
 
@@ -674,7 +727,7 @@
         aggiornaBarraStickyCarrello();
     }
 
-    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO
+    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO CON FORMATO AGGIORNATO .webp
     async function apriCatalogoProduttore(idProduttore, nomeProduttore, nomeCategoria, idCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
         AppState.categoriaAttivaId = idCategoria;
@@ -702,7 +755,8 @@
             const safeNome = p.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeDesc = p.descrizione ? p.descrizione.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
             
-            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.jpg`;
+            // Richiamo nativo immagine WebP compressa
+            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.webp`;
             const itemInCart = AppState.carrello.find(i => i.codice_articolo === cod && i.id_bottega == AppState.bottegaAttivaId);
             const qtaAttuale = itemInCart ? itemInCart.quantita : 0;
             
@@ -711,7 +765,7 @@
                 <div class="card shadow-sm h-100">
                     <div style="height: 200px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px; position: relative; cursor: pointer;" onclick="apriGalleria('${cod}', '${safeNome}', ${p.prezzo_netto}, ${idCategoria}, ${idProduttore}, '${nomeProduttore.replace(/'/g, "\\'")}', ${p.pvp}, '${safeDesc}')">
                         <img src="${imgUrl}" 
-                             onerror="if(!this.dataset.triedJPG){ this.dataset.triedJPG=true; this.src='${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.JPG'; } else { this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.'; }" 
+                             onerror="this.onerror=null; this.src='https://via.placeholder.com/300x300?text=Foto+non+disp.';" 
                              style="max-height: 100%; max-width: 100%; object-fit: contain; transition: 0.3s;" 
                              onmouseover="this.style.transform='scale(1.05)'" 
                              onmouseout="this.style.transform='scale(1)'">
@@ -753,7 +807,7 @@
         aggiornaBarraStickyCarrello();
     }
 
-    // POP-UP FOTO CON DETTAGLI, DESCRIZIONE E CARRELLO INCLUSI
+    // GALLERIA POP-UP FOTO CON SUPPORTO FILE COMPOSTI .webp
     function apriGalleria(codice, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore, pvp, descrizione) {
         document.getElementById('galleryModalLabel').innerText = nome;
         const carouselInner = document.getElementById('carousel-inner-content');
@@ -763,15 +817,14 @@
         let html = '';
 
         estensioni.forEach((ext, i) => {
-            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.jpg`;
-            const imgUrlJPG = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.JPG`;
+            const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice}${ext}.webp`;
             
             html += `
             <div class="carousel-item ${i === 0 ? 'active' : ''} p-3">
                 <img src="${imgUrl}" 
                      class="d-block mx-auto" 
                      style="height: 45vh; max-width: 100%; object-fit: contain;" 
-                     onerror="if(!this.dataset.triedJPG){ this.dataset.triedJPG=true; this.src='${imgUrlJPG}'; } else { this.parentElement.remove(); }">
+                     onerror="this.parentElement.remove();">
             </div>`;
         });
         carouselInner.innerHTML = html;
@@ -910,7 +963,7 @@
             .reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
     }
 
-    // MONITORAGGIO DEL BUDGET IN TEMPO REALE SULLA SPECIFICA CATEGORIA ATTIVA
+    // MONITORAGGIO BUDGET SPECIFICO DI CATEGORIA
     function aggiornaBarraStickyCarrello() {
         const totaleGlobale = AppState.carrello.reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
         const numeroPezzi = AppState.carrello.reduce((sum, i) => sum + i.quantita, 0);
@@ -918,7 +971,6 @@
         const bottegaAttiva = AppState.botteghe.find(b => b.id_bottega == AppState.bottegaAttivaId);
         let badgeBudget = "";
 
-        // Se siamo dentro a una categoria specifica, tracciamo il budget ad essa associato
         if (bottegaAttiva && AppState.categoriaAttivaId) {
             const mappaBudget = bottegaAttiva.budget || {};
             const budgetSpecificoCategoria = parseFloat(mappaBudget[AppState.categoriaAttivaId]) || 0;
@@ -959,7 +1011,6 @@
             return;
         }
 
-        // Generazione avvisi per sforamento budget su singole categorie (Nessun blocco all'ordine)
         let avvisiBudgetHtml = "";
         AppState.botteghe.forEach(b => {
             const mappaBudget = b.budget || {};
@@ -974,7 +1025,7 @@
                         const infoCat = AppState.categorieCache.find(c => c.id_categoria == catId) || {nome_categoria: 'Sconosciuta'};
                         avvisiBudgetHtml += `
                         <div class="alert alert-warning py-2 mb-2 border-warning-subtle text-dark fw-semibold small d-flex justify-content-between align-items-center shadow-sm">
-                            <span>⚠️ La bottega <strong>${b.nome_bottega}</strong> ha superato il budget impostato per la categoria <strong>${infoCat.nome_categoria}</strong></span>
+                            <span>⚠️ La bottega <strong>${b.nome_bottega}</strong> ha sforato il budget per la categoria <strong>${infoCat.nome_categoria}</strong></span>
                             <span class="badge bg-danger font-monospace fs-6">€ ${totSpesoCat.toFixed(2).replace('.',',')} / € ${limiteBudget.toFixed(2).replace('.',',')}</span>
                         </div>`;
                     }
