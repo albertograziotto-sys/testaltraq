@@ -57,7 +57,6 @@
     .product-img-click:hover { opacity: 0.85; }
     
     .cart-sticky { position: sticky; bottom: 0; left: 0; width: 100%; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.08); border-top: 3px solid var(--brand); }
-    .cart-item { border-bottom: 1px solid #f0e6e6; padding-bottom: 10px; margin-bottom: 10px; }
     
     .eye-btn { cursor: pointer; background-color: #f8f9fa; border-color: #dee2e6; }
 
@@ -71,8 +70,6 @@
 <body>
 
   <!-- ==================== SEZIONI AUTENTICAZIONE ==================== -->
-  
-  <!-- LOGIN -->
   <div id="login-section" class="center-screen">
     <div class="auth-card text-center">
       <h3 class="mb-2 fw-bold text-brand">Altraqualità</h3>
@@ -94,13 +91,11 @@
       </div>
       <button class="btn btn-brand w-100 fw-bold py-2 shadow-sm" onclick="eseguiLogin()" id="btn-login">Accedi al Portale</button>
       <p id="login-error" class="text-danger mt-3 mb-0 fw-bold" style="display:none;">Credenziali errate o account non verificato.</p>
-      
       <hr class="mt-4 mb-3" style="opacity: 0.1;">
       <p class="small text-muted mb-0">Sei un nuovo cliente? <a href="#" onclick="event.preventDefault(); cambiaVista('register-section')" class="text-brand fw-bold text-decoration-none">Registrati ora</a></p>
     </div>
   </div>
 
-  <!-- REGISTRAZIONE -->
   <div id="register-section" class="center-screen" style="display: none; padding-top: 40px; padding-bottom: 40px;">
     <div class="auth-card text-center">
       <h4 class="mb-4 fw-bold text-brand">Nuovo Account B2B</h4>
@@ -133,7 +128,6 @@
     </div>
   </div>
 
-  <!-- RECUPERO PASSWORD -->
   <div id="forgot-password-section" class="center-screen" style="display: none;">
     <div class="auth-card text-center">
       <h4 class="mb-3 fw-bold text-brand">Recupero Password</h4>
@@ -151,15 +145,12 @@
 
 
   <!-- ==================== DASHBOARD E APP ==================== -->
-
-  <!-- NAVBAR PRINCIPALE -->
   <div id="main-navbar" class="top-nav" style="display: none;">
     <div class="d-flex align-items-center">
       <button class="btn-hamburger d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">&#9776;</button>
       <h4 class="mb-0 text-white fw-bold">Altraqualità B2B</h4>
     </div>
     <div class="top-nav-buttons d-flex align-items-center">
-      <!-- Selettore Bottega -->
       <div class="me-3 d-none d-md-flex align-items-center bg-white rounded-pill px-2 py-1 shadow-sm">
         <span class="text-muted small fw-bold me-2 ps-2">Stai ordinando per:</span>
         <select id="global-bottega-selector" class="form-select form-select-sm border-0 fw-bold text-brand" style="box-shadow: none; cursor: pointer;" onchange="cambiaBottegaAttiva()">
@@ -200,7 +191,6 @@
         <!-- SEZIONE 1: VETRINA FORNITORI / CATALOGO -->
         <div id="app-section">
           <div id="app-container" class="row text-center py-2">
-            <!-- Qui JS inietterà prima le Card dei Fornitori, poi il catalogo del fornitore scelto -->
             <div class="spinner-border text-brand mx-auto mt-5"></div>
             <p class="text-muted mt-3 fw-bold">Inizializzazione portale...</p>
           </div>
@@ -214,10 +204,19 @@
           </div>
         </div>
 
-        <!-- SEZIONE 3: CHECKOUT -->
+        <!-- SEZIONE 3: CHECKOUT (Raggruppato per Fornitore) -->
         <div id="checkout-section" style="display: none;">
           <div class="full-page-card border-top-0 w-100" style="max-width: 100%; border-top: 6px solid var(--brand) !important;">
-            <h3 class="fw-bold text-brand mb-4 border-bottom pb-3">Riepilogo Ordine</h3>
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <h3 class="fw-bold text-brand m-0">Checkout Carrello</h3>
+                <button class="btn btn-outline-secondary btn-sm fw-bold" onclick="navigaA('app-section')">Torna agli acquisti</button>
+            </div>
+            
+            <div class="alert alert-info border-0 shadow-sm mb-4">
+                <h6 class="fw-bold mb-1">Bottega di Ritiro: <span id="checkout-bottega-name" class="text-brand">Nessuna</span></h6>
+                <p class="mb-0 small text-muted">Gli ordini sottostanti verranno assegnati a questa bottega. Assicurati di raggiungere il minimo d'ordine per i fornitori da cui vuoi acquistare.</p>
+            </div>
+
             <div id="checkout-content"></div>
           </div>
         </div>
@@ -241,9 +240,7 @@
             
             <hr style="opacity: 0.1;">
             <h5 class="fw-bold text-dark mt-4 mb-3">Le Mie Botteghe</h5>
-            <div id="botteghe-list-container" class="mb-4">
-                <!-- JS inietterà la lista delle botteghe o il form per aggiungerle -->
-            </div>
+            <div id="botteghe-list-container" class="mb-4"></div>
 
             <hr style="opacity: 0.1;">
             <h6 class="fw-bold text-brand mb-3 mt-4">Cambio Password Sicuro</h6>
@@ -262,27 +259,26 @@
   <!-- BARRA CARRELLO GLOBALE STICKY -->
   <div id="cart-sticky-bar" class="bg-white p-3 cart-sticky justify-content-between align-items-center px-md-5" style="display: none;">
     <div>
-      <span class="text-muted text-uppercase small fw-bold">Totale Ordine:</span>
+      <span class="text-muted text-uppercase small fw-bold">Totale Bottega Selezionata:</span>
       <h4 class="mb-0 text-brand fw-bold d-inline ms-2" id="cart-total-bar">€ 0.00</h4>
     </div>
-    <button class="btn btn-brand btn-lg fw-bold shadow px-4" onclick="navigaA('checkout-section')">
+    <button class="btn btn-brand btn-lg fw-bold shadow px-4" onclick="vaiAlCheckout()">
       Vai al Riepilogo <span class="badge bg-white text-brand ms-2 fs-6 rounded-pill" id="cart-badge">0</span>
     </button>
   </div>
 
-  <!-- MODALE GENERICO DI SUCCESSO -->
+  <!-- MODALI -->
   <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg" style="border-top: 6px solid var(--brand) !important;">
         <div class="modal-body text-center p-5 pt-4">
-          <h3 class="fw-bold text-brand mb-3 mt-3">Operazione Completata! 🎉</h3>
+          <h3 class="fw-bold text-brand mb-3 mt-3">Operazione Completata!</h3>
           <p class="text-secondary fs-6 mb-4" id="success-modal-msg"></p>
           <button type="button" class="btn btn-brand btn-lg w-100 fw-bold shadow-sm" data-bs-dismiss="modal">Chiudi</button>
         </div>
       </div>
     </div>
   </div>
-
 
   <!-- ==================== LOGICA JAVASCRIPT ==================== -->
   <script>
@@ -291,20 +287,19 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
     const clientDB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // STATO DELL'APPLICAZIONE
     const AppState = {
         user: null,
         fornitori: [],
         botteghe: [],
         bottegaAttivaId: null,
+        fornitoreAttivo: null,
         carrelli: {} 
     };
 
-    // INIZIALIZZAZIONE E CONTROLLO SESSIONE
     window.addEventListener('DOMContentLoaded', async () => {
         const { data: { session } } = await clientDB.auth.getSession();
         if (session) {
-            const { data: clienteData } = await clientDB.from('clienti').select('*').eq('email', session.user.email).single();
+            const { data: clienteData } = await clientDB.from('clienti').select('*').eq('id', session.user.id).single();
             if (clienteData) {
                 AppState.user = clienteData;
                 inizializzaDashboard();
@@ -312,13 +307,11 @@
         }
     });
 
-    // GESTIONE UI (Viste e Menu)
     function cambiaVista(vistaID) {
       ['login-section', 'register-section', 'forgot-password-section', 'dashboard-wrapper', 'main-navbar', 'cart-sticky-bar'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.style.display = 'none';
       });
-      
       if(vistaID === 'login-section' || vistaID === 'register-section' || vistaID === 'forgot-password-section') {
         document.getElementById(vistaID).style.display = 'flex';
       } else {
@@ -331,6 +324,8 @@
     function navigaA(sezione) {
       ['app-section', 'orders-section', 'checkout-section', 'profile-section'].forEach(id => document.getElementById(id).style.display = 'none');
       document.getElementById(sezione).style.display = 'block';
+      
+      // La barra sticky appare in app-section o in checkout, ma per pulizia la mostriamo solo nel catalogo
       document.getElementById('cart-sticky-bar').style.display = (sezione === 'app-section') ? 'flex' : 'none';
 
       document.querySelectorAll('.sidebar-menu button').forEach(b => {
@@ -339,10 +334,12 @@
       });
 
       if(sezione === 'app-section') document.getElementById('nav-fornitori').classList.add('active', 'fw-bold');
-      if(sezione === 'orders-section') document.getElementById('nav-ordini').classList.add('active', 'fw-bold');
+      if(sezione === 'orders-section') {
+          document.getElementById('nav-ordini').classList.add('active', 'fw-bold');
+          caricaStoricoOrdini();
+      }
       if(sezione === 'profile-section') document.getElementById('nav-profilo').classList.add('active', 'fw-bold');
 
-      // Chiudi menu laterale su mobile
       const offcanvasMenu = document.getElementById('sidebarMenu');
       if (offcanvasMenu && window.innerWidth < 768) {
           const bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasMenu);
@@ -355,7 +352,37 @@
       field.type = field.type === "password" ? "text" : "password";
     }
 
-    // AUTH: LOGIN E LOGOUT
+    /* AUTHENTICATION */
+    async function eseguiRegistrazione() {
+      const ragSoc = document.getElementById('reg-ragionesociale').value.trim();
+      const piva = document.getElementById('reg-piva').value.trim();
+      const tel = document.getElementById('reg-telefono').value.trim();
+      const email = document.getElementById('reg-email').value.trim().toLowerCase();
+      const psw = document.getElementById('reg-password').value.trim();
+      const btn = document.getElementById('btn-register');
+
+      if(!ragSoc || !email || !psw) return alert("Compila Ragione Sociale, Email e Password!");
+      if(psw.length < 6) return alert("La password deve avere almeno 6 caratteri.");
+      
+      btn.innerText = "Creazione in corso..."; btn.disabled = true;
+
+      const { data: authData, error: authError } = await clientDB.auth.signUp({ email: email, password: psw });
+      if (authError) { alert("Errore registrazione: " + authError.message); btn.innerText = "Crea Account Sicuro"; btn.disabled = false; return; }
+
+      const userId = authData.user.id;
+      const { error: dbError } = await clientDB.from('clienti').insert([{ id: userId, email: email, password: psw, ragione_sociale: ragSoc, partita_iva: piva, telefono: tel }]);
+
+      if (dbError) alert("Account creato ma anagrafica non salvata: " + dbError.message);
+      else {
+          document.getElementById('success-modal-msg').innerHTML = "Ti abbiamo inviato un'email a <b>" + email + "</b>. Clicca sul link all'interno per confermare l'account.";
+          new bootstrap.Modal(document.getElementById('successModal')).show();
+          document.getElementById('successModal').addEventListener('hidden.bs.modal', function () {
+              cambiaVista('login-section'); document.getElementById('login-email').value = email;
+          }, { once: true });
+      }
+      btn.innerText = "Crea Account Sicuro"; btn.disabled = false;
+    }
+
     async function eseguiLogin() {
       const email = document.getElementById('login-email').value.trim().toLowerCase();
       const psw = document.getElementById('login-password').value.trim();
@@ -369,33 +396,393 @@
       if (authError) { errorMsg.style.display = 'block'; btn.innerText = "Accedi al Portale"; btn.disabled = false; return; }
       
       const { data: clienteData, error: dbError } = await clientDB.from('clienti').select('*').eq('email', email).single();
-      if (dbError || !clienteData) { alert("Anagrafica non trovata."); clientDB.auth.signOut(); btn.innerText = "Accedi al Portale"; btn.disabled = false; return; }
+      if (dbError || !clienteData) { alert("Anagrafica non trovata."); await clientDB.auth.signOut(); btn.innerText = "Accedi al Portale"; btn.disabled = false; return; }
 
       AppState.user = clienteData; 
       inizializzaDashboard();
     }
 
     async function eseguiLogout() {
-      await clientDB.auth.signOut(); 
-      AppState.user = null; 
+      await clientDB.auth.signOut(); AppState.user = null; AppState.carrelli = {};
       document.getElementById('login-password').value = ''; 
-      const btnLogin = document.getElementById('btn-login'); 
-      if (btnLogin) { btnLogin.innerText = "Accedi al Portale"; btnLogin.disabled = false; }
+      const btn = document.getElementById('btn-login'); if (btn) { btn.innerText = "Accedi al Portale"; btn.disabled = false; }
       cambiaVista('login-section');
     }
 
-    // AVVIO APPLICAZIONE POST-LOGIN
+    async function eseguiRecuperoPassword() {
+        const email = document.getElementById('recupero-email').value.trim().toLowerCase();
+        if(!email) return alert("Inserisci l'email.");
+        const { error } = await clientDB.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+        if (error) alert("Errore: " + error.message); else alert("Email inviata!");
+    }
+
+    async function salvaNuovaPassword() {
+        const psw = document.getElementById('prof-nuova-psw').value.trim();
+        if(psw.length < 6) return alert("Minimo 6 caratteri.");
+        const { error } = await clientDB.auth.updateUser({ password: psw });
+        if (error) alert("Errore: " + error.message); 
+        else { 
+            await clientDB.from('clienti').update({ password: psw }).eq('id', AppState.user.id);
+            alert("Password aggiornata!"); document.getElementById('prof-nuova-psw').value = ''; 
+        }
+    }
+
+    /* INIZIALIZZAZIONE DASHBOARD */
     async function inizializzaDashboard() {
         document.getElementById('nome-cliente-display').innerText = AppState.user.ragione_sociale;
         document.getElementById('prof-ragione').value = AppState.user.ragione_sociale || ''; 
         document.getElementById('prof-email').value = AppState.user.email || '';
-        
         cambiaVista('app-section');
-        
-        // Qui poi inseriremo le funzioni per caricare Botteghe e Fornitori
-        document.getElementById('app-container').innerHTML = `<h5 class="text-brand fw-bold mt-5">In attesa della logica delle Botteghe...</h5>`;
+        await caricaBotteghe();
     }
 
+    async function caricaBotteghe() {
+        const app = document.getElementById('app-container');
+        app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-3 fw-bold">Caricamento botteghe...</p>';
+
+        let { data: botteghe, error } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
+        if (error) return console.error(error);
+
+        if (!botteghe || botteghe.length === 0) {
+            const bottegheTest = [
+                { id_cliente: AppState.user.id, nome_bottega: 'Angoli di Mondo', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Acli San Gaetano (Bandera Florida)', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Unicomondo', indirizzo: '' },
+                { id_cliente: AppState.user.id, nome_bottega: 'Pace e Sviluppo', indirizzo: '' }
+            ];
+            await clientDB.from('botteghe').insert(bottegheTest);
+            let { data: bNew } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
+            botteghe = bNew;
+        }
+
+        AppState.botteghe = botteghe;
+        popolaSelettoreBotteghe();
+        disegnaBottegheProfilo();
+        caricaFornitori();
+    }
+
+    function popolaSelettoreBotteghe() {
+        const selector = document.getElementById('global-bottega-selector');
+        let html = `<option value="" disabled selected>Seleziona Bottega...</option>`;
+        AppState.botteghe.forEach(b => html += `<option value="${b.id_bottega}">${b.nome_bottega}</option>`);
+        selector.innerHTML = html;
+        if(AppState.bottegaAttivaId) selector.value = AppState.bottegaAttivaId;
+    }
+
+    function cambiaBottegaAttiva() {
+        AppState.bottegaAttivaId = document.getElementById('global-bottega-selector').value;
+        aggiornaInterfacciaCarrello();
+    }
+
+    function disegnaBottegheProfilo() {
+        const container = document.getElementById('botteghe-list-container');
+        let html = '';
+        AppState.botteghe.forEach(b => {
+            html += `
+            <div class="bg-light p-3 rounded mb-3 border border-secondary-subtle">
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
+                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
+                    <div class="col-md-2 text-end"><button class="btn btn-outline-brand w-100 fw-bold shadow-sm" onclick="salvaModificaBottega(${b.id_bottega})">Salva</button></div>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    async function salvaModificaBottega(idBottega) {
+        const nNome = document.getElementById(`edit-nome-${idBottega}`).value.trim();
+        const nInd = document.getElementById(`edit-ind-${idBottega}`).value.trim();
+        if (!nNome) return alert("Il nome non può essere vuoto.");
+        const { error } = await clientDB.from('botteghe').update({ nome_bottega: nNome, indirizzo: nInd }).eq('id_bottega', idBottega);
+        if (error) alert("Errore: " + error.message);
+        else {
+            const b = AppState.botteghe.find(x => x.id_bottega === idBottega);
+            if (b) { b.nome_bottega = nNome; b.indirizzo = nInd; }
+            popolaSelettoreBotteghe();
+            document.getElementById('success-modal-msg').innerText = "Bottega aggiornata.";
+            new bootstrap.Modal(document.getElementById('successModal')).show();
+        }
+    }
+
+    /* FORNITORI E PRODOTTI */
+    async function caricaFornitori() {
+        const app = document.getElementById('app-container');
+        const { data: fornitori, error } = await clientDB.from('fornitori').select('*').order('nome');
+        if (error) { app.innerHTML = `<p class="text-danger fw-bold">Errore: ${error.message}</p>`; return; }
+        AppState.fornitori = fornitori;
+        disegnaVetrinaFornitori();
+    }
+
+    function disegnaVetrinaFornitori() {
+        const app = document.getElementById('app-container');
+        let html = `<div class="col-12 mb-4 text-start"><h3 class="fw-bold text-brand">I Nostri Fornitori</h3><p class="text-muted">Seleziona un fornitore per visualizzare il catalogo e iniziare l'ordine.</p></div>`;
+        AppState.fornitori.forEach(f => {
+            html += `
+            <div class="col-md-6 col-lg-4 mb-4 text-start">
+                <div class="card shadow-sm h-100 border-0" style="border-top: 5px solid var(--brand) !important; cursor: pointer; transition: transform 0.2s;" onclick="apriCatalogoFornitore('${f.nome}')" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <h4 class="fw-bold text-dark mb-3">${f.nome}</h4>
+                        <div class="mt-auto p-3 bg-light rounded border border-secondary-subtle">
+                            <span class="text-muted small fw-bold d-block mb-1">Minimo d'ordine richiesto:</span>
+                            <h5 class="text-brand fw-bold mb-0">€ ${f.minimo_ordine.toFixed(2).replace('.', ',')}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        app.innerHTML = html;
+        document.getElementById('cart-sticky-bar').style.display = 'flex';
+    }
+
+    async function apriCatalogoFornitore(nomeFornitore) {
+        if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
+        
+        const app = document.getElementById('app-container');
+        app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div>';
+        AppState.fornitoreAttivo = AppState.fornitori.find(f => f.nome === nomeFornitore);
+
+        const { data: prodotti, error } = await clientDB.from('prodotti').select('*').eq('fornitore', nomeFornitore).order('nome');
+        if (error) { app.innerHTML = `<p class="text-danger">Errore: ${error.message}</p>`; return; }
+        disegnaProdottiFornitore(nomeFornitore, prodotti);
+    }
+
+    function disegnaProdottiFornitore(nomeFornitore, prodotti) {
+        const app = document.getElementById('app-container');
+        let html = `
+        <div class="col-12 mb-4 text-start">
+            <button class="btn btn-outline-secondary btn-sm mb-3 fw-bold" onclick="disegnaVetrinaFornitori()">← Torna ai Fornitori</button>
+            <h3 class="fw-bold text-brand">${nomeFornitore}</h3>
+            <p class="text-muted">Minimo d'ordine richiesto: <span class="fw-bold text-dark">€ ${AppState.fornitoreAttivo.minimo_ordine.toFixed(2).replace('.', ',')}</span></p>
+        </div><div class="row w-100 m-0">`;
+
+        if(prodotti.length === 0) html += `<div class="col-12"><p class="text-muted fw-bold">Nessun prodotto trovato.</p></div>`;
+        
+        prodotti.forEach(p => {
+            const cod = p.codice_articolo;
+            const desc = p.nome;
+            const safeDesc = desc.replace(/'/g, "\'").replace(/"/g, '&quot;');
+            const imgUrl = `https://tmaxqbosibkxrghgwfzi.supabase.co/storage/v1/object/public/foto/${cod}.jpg`;
+            
+            html += `
+            <div class="col-xl-3 col-lg-4 col-sm-6 product-card text-start mb-4">
+                <div class="card shadow-sm h-100">
+                    <div style="height: 180px; background: #fff; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: center; padding: 15px;">
+                        <img src="${imgUrl}" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=NO+IMG';" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    </div>
+                    <div class="card-body d-flex flex-column bg-white border-top">
+                        <h6 class="card-title fw-bold text-dark mt-1" style="font-size: 0.95rem; line-height: 1.3;" title="${safeDesc}">${desc}</h6>
+                        <p class="text-muted mb-2" style="font-size: 0.75rem;">COD. ${cod}</p>
+                        <h4 class="text-brand fw-bold mb-3 mt-auto">€ ${p.prezzo_netto.toFixed(2).replace('.', ',')}</h4>
+                        <div class="d-flex align-items-center mt-auto">
+                            <div class="input-group me-2" style="width: 110px;">
+                                <button class="btn btn-outline-secondary btn-qta px-2" onclick="modificaQta('qty_${cod}', -1)">-</button>
+                                <input type="number" class="form-control text-center fw-bold p-0" value="1" min="1" id="qty_${cod}">
+                                <button class="btn btn-outline-secondary btn-qta px-2" onclick="modificaQta('qty_${cod}', 1)">+</button>
+                            </div>
+                            <button class="btn btn-outline-brand flex-grow-1 px-1 fw-bold" onclick="addToCart('${cod}', '${safeDesc}', ${p.prezzo_netto}, '${nomeFornitore}', 'qty_${cod}')">Agg.</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+        app.innerHTML = html;
+        aggiornaInterfacciaCarrello();
+    }
+
+    /* CARRELLO */
+    function modificaQta(inputId, delta) {
+        const input = document.getElementById(inputId);
+        if(!input) return;
+        let val = parseInt(input.value) || 1;
+        val += delta; if (val < 1) val = 1;
+        input.value = val;
+    }
+
+    function addToCart(codice, desc, prezzo, fornitore, inputId) {
+        const bottegaId = AppState.bottegaAttivaId;
+        if(!bottegaId) return alert("Seleziona una bottega dal menu in alto!");
+        const qtyInput = document.getElementById(inputId);
+        const qta = qtyInput ? parseInt(qtyInput.value) : 1;
+
+        if (qta > 0) {
+            if(!AppState.carrelli[bottegaId]) AppState.carrelli[bottegaId] = {};
+            let c = AppState.carrelli[bottegaId];
+            if(c[codice]) c[codice].qta += qta; else c[codice] = { codice, desc, prezzo, fornitore, qta };
+            aggiornaInterfacciaCarrello();
+            if(qtyInput) qtyInput.value = 1;
+        }
+    }
+
+    function aggiornaInterfacciaCarrello() {
+        const bottegaId = AppState.bottegaAttivaId;
+        let tot = 0; let pezzi = 0;
+        if (bottegaId && AppState.carrelli[bottegaId]) {
+            Object.values(AppState.carrelli[bottegaId]).forEach(item => { tot += (item.prezzo * item.qta); pezzi += item.qta; });
+        }
+        document.getElementById('cart-total-bar').innerText = `€ ${tot.toFixed(2).replace('.', ',')}`;
+        document.getElementById('cart-badge').innerText = pezzi;
+    }
+
+    function rimuoviDalCarrelloCheckout(codice) {
+        if(AppState.carrelli[AppState.bottegaAttivaId] && AppState.carrelli[AppState.bottegaAttivaId][codice]) {
+            delete AppState.carrelli[AppState.bottegaAttivaId][codice];
+            aggiornaInterfacciaCarrello();
+            disegnaCheckout();
+        }
+    }
+
+    /* CHECKOUT */
+    function vaiAlCheckout() {
+        if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega!");
+        const cartItems = AppState.carrelli[AppState.bottegaAttivaId] ? Object.values(AppState.carrelli[AppState.bottegaAttivaId]) : [];
+        if(cartItems.length === 0) return alert("Il carrello per questa bottega è vuoto.");
+        
+        const b = AppState.botteghe.find(x => x.id_bottega == AppState.bottegaAttivaId);
+        document.getElementById('checkout-bottega-name').innerText = b ? b.nome_bottega : 'Sconosciuta';
+        
+        navigaA('checkout-section');
+        disegnaCheckout();
+    }
+
+    function disegnaCheckout() {
+        const container = document.getElementById('checkout-content');
+        const cartItems = AppState.carrelli[AppState.bottegaAttivaId] ? Object.values(AppState.carrelli[AppState.bottegaAttivaId]) : [];
+        
+        if(cartItems.length === 0) {
+            container.innerHTML = '<p class="text-muted fw-bold">Il carrello è vuoto.</p>';
+            return;
+        }
+
+        // Raggruppo per fornitore
+        let ordiniPerFornitore = {};
+        cartItems.forEach(item => {
+            if(!ordiniPerFornitore[item.fornitore]) ordiniPerFornitore[item.fornitore] = { items: [], totale: 0 };
+            ordiniPerFornitore[item.fornitore].items.push(item);
+            ordiniPerFornitore[item.fornitore].totale += (item.prezzo * item.qta);
+        });
+
+        let html = '';
+        for (const [fornitoreNome, data] of Object.entries(ordiniPerFornitore)) {
+            const fornitoreInfo = AppState.fornitori.find(f => f.nome === fornitoreNome);
+            const minimo = fornitoreInfo ? fornitoreInfo.minimo_ordine : 0;
+            const raggiunto = data.totale >= minimo;
+            
+            let statusHtml = raggiunto 
+                ? `<span class="badge bg-success mb-2 px-3 py-2">✅ Minimo raggiunto</span>` 
+                : `<span class="badge bg-danger mb-2 px-3 py-2">❌ Manca € ${(minimo - data.totale).toFixed(2).replace('.',',')} per il minimo d'ordine (€ ${minimo})</span>`;
+
+            html += `
+            <div class="card mb-4 shadow-sm border-0 bg-light">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark m-0">Fornitore: <span class="text-brand">${fornitoreNome}</span></h5>
+                    <h4 class="fw-bold m-0 ${raggiunto ? 'text-success' : 'text-danger'}">Totale: € ${data.totale.toFixed(2).replace('.',',')}</h4>
+                </div>
+                <div class="card-body p-4">
+                    ${statusHtml}
+                    <hr class="mt-2 mb-3" style="opacity:0.1">`;
+            
+            data.items.forEach(item => {
+                html += `
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                    <div style="max-width: 70%;">
+                        <h6 class="mb-1 text-dark fw-bold" style="font-size: 0.9rem;">${item.desc}</h6>
+                        <small class="text-muted">${item.qta} pz x € ${item.prezzo.toFixed(2).replace('.', ',')}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold text-dark mb-1">€ ${(item.prezzo * item.qta).toFixed(2).replace('.', ',')}</div>
+                        <button class="btn btn-sm btn-link text-danger p-0 fw-bold text-decoration-none" onclick="rimuoviDalCarrelloCheckout('${item.codice}')">Rimuovi</button>
+                    </div>
+                </div>`;
+            });
+
+            html += `
+                <div class="mt-4 text-end">
+                    <button class="btn ${raggiunto ? 'btn-brand' : 'btn-secondary'} fw-bold shadow-sm px-4" ${!raggiunto ? 'disabled' : ''} onclick="inviaOrdineSingolo('${fornitoreNome}')">
+                        ${raggiunto ? 'Invia Ordine ' + fornitoreNome : 'Minimo non raggiunto'}
+                    </button>
+                </div>
+            </div></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    async function inviaOrdineSingolo(fornitoreNome) {
+        const bottegaId = AppState.bottegaAttivaId;
+        const cartItems = Object.values(AppState.carrelli[bottegaId]).filter(i => i.fornitore === fornitoreNome);
+        if(cartItems.length === 0) return;
+
+        // Recuperiamo il budget imputato dall'utente per questo fornitore (Opzionale: puoi aggiungere un input nel disegno del checkout se vuoi)
+        // Per mantenere la UX fluida e strettamente in linea con le richieste, inviamo l'ordine base.
+        
+        const btn = event.target;
+        btn.innerHTML = "Invio in corso..."; btn.disabled = true;
+
+        const { data: orderData, error: errTestata } = await clientDB.from('ordini_testata').insert([{ 
+            id_cliente: AppState.user.id, 
+            id_bottega: bottegaId, 
+            fornitore: fornitoreNome 
+        }]).select();
+
+        if (errTestata || !orderData) {
+            alert("Errore invio ordine: " + errTestata.message);
+            btn.innerHTML = "Invia Ordine " + fornitoreNome; btn.disabled = false; return; 
+        }
+
+        const newOrderId = orderData[0].id_ordine;
+        const righeDettaglio = cartItems.map(item => ({ 
+            id_ordine: newOrderId, 
+            codice_articolo: item.codice, 
+            quantita: item.qta, 
+            prezzo_unitario_applicato: item.prezzo 
+        }));
+
+        const { error: errDett } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
+
+        if (errDett) {
+            alert("Errore inserimento righe.");
+        } else {
+            // Rimuovo dal carrello locale solo gli item di questo fornitore
+            cartItems.forEach(item => { delete AppState.carrelli[bottegaId][item.codice]; });
+            aggiornaInterfacciaCarrello();
+            disegnaCheckout();
+            
+            document.getElementById('success-modal-msg').innerText = "L'ordine per " + fornitoreNome + " è stato inviato con successo!";
+            new bootstrap.Modal(document.getElementById('successModal')).show();
+        }
+    }
+
+    /* STORICO ORDINI */
+    async function caricaStoricoOrdini() {
+        const container = document.getElementById('orders-list-container');
+        container.innerHTML = '<div class="spinner-border text-brand mx-auto d-block mt-4"></div>';
+
+        const { data: ordini, error } = await clientDB.from('ordini_testata')
+            .select('*, botteghe(nome_bottega)')
+            .eq('id_cliente', AppState.user.id)
+            .order('id_ordine', { ascending: false });
+
+        if (error) { container.innerHTML = `<p class="text-danger fw-bold">Errore caricamento storico.</p>`; return; }
+        if (!ordini || ordini.length === 0) { container.innerHTML = `<p class="text-muted fw-bold">Nessun ordine effettuato finora.</p>`; return; }
+
+        let html = '<div class="list-group">';
+        ordini.forEach(ord => {
+            const bName = ord.botteghe ? ord.botteghe.nome_bottega : 'Bottega Sconosciuta';
+            const dataStr = new Date(ord.data_ordine).toLocaleDateString('it-IT');
+            html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap p-3 mb-3 shadow-sm rounded bg-light order-card">
+                <div>
+                    <h5 class="mb-1 fw-bold text-dark">Ordine #${ord.id_ordine} - <span class="text-brand">${ord.fornitore}</span></h5>
+                    <p class="mb-1 text-secondary small">📅 Inviato il: <span class="fw-bold text-dark">${dataStr}</span></p>
+                    <p class="mb-0 text-secondary small">📍 Bottega: <span class="fw-bold text-dark">${bName}</span></p>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
   </script>
 </body>
 </html>
