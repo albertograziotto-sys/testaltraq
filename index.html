@@ -322,6 +322,10 @@
             const { data: clienteData } = await clientDB.from('clienti').select('*').eq('id', session.user.id).single();
             if (clienteData) {
                 AppState.user = clienteData;
+                // Carichiamo la bozza cloud se esiste
+                if(clienteData.carrello_bozza) {
+                    AppState.carrello = clienteData.carrello_bozza;
+                }
                 inizializzaDashboard();
             }
         }
@@ -440,6 +444,13 @@
       if (dbError || !clienteData) { alert("Anagrafica non trovata."); await clientDB.auth.signOut(); btn.innerText = "Accedi al Portale"; btn.disabled = false; return; }
 
       AppState.user = clienteData; 
+      // Ripristiniamo la bozza cloud dal database
+      if(clienteData.carrello_bozza) {
+          AppState.carrello = clienteData.carrello_bozza;
+      } else {
+          AppState.carrello = [];
+      }
+      
       inizializzaDashboard();
     }
 
@@ -448,6 +459,16 @@
       document.getElementById('login-password').value = ''; 
       const btn = document.getElementById('btn-login'); if (btn) { btn.innerText = "Accedi al Portale"; btn.disabled = false; }
       cambiaVista('login-section');
+    }
+
+    /* === SALVATAGGIO IN CLOUD DELLA BOZZA CARRELLO === */
+    async function salvaCarrelloInBozza() {
+        if (!AppState.user) return;
+        const { error } = await clientDB.from('clienti')
+            .update({ carrello_bozza: AppState.carrello })
+            .eq('id', AppState.user.id);
+            
+        if (error) console.error("Errore salvataggio bozza cloud:", error.message);
     }
 
     /* === INIZIALIZZAZIONE === */
@@ -486,7 +507,6 @@
         popolaSelettoreBotteghe();
         disegnaBottegheProfilo();
         
-        // Se la bottega precedentemente attiva è stata eliminata o non impostata, assegna la prima disponibile
         if(!AppState.bottegaAttivaId && AppState.botteghe.length > 0) {
             AppState.bottegaAttivaId = AppState.botteghe[0].id_bottega;
             document.getElementById('global-bottega-selector').value = AppState.bottegaAttivaId;
@@ -549,6 +569,10 @@
         } else {
             if(AppState.bottegaAttivaId == idBottega) AppState.bottegaAttivaId = null;
             AppState.carrello = AppState.carrello.filter(i => i.id_bottega != idBottega);
+            
+            // Salviamo il carrello sfoltito in cloud
+            await salvaCarrelloInBozza();
+            
             alert("Bottega eliminata con successo!");
             await caricaBotteghe();
         }
@@ -654,6 +678,12 @@
         const { data: categorie, error } = await clientDB.from('categorie').select('*').eq('id_campagna', idCampagna).order('nome_categoria');
         if (error) { app.innerHTML = `<p class="text-danger fw-bold">Errore: ${error.message}</p>`; return; }
         
+        categorie.forEach(c => {
+            if(!AppState.categorieCache.find(cat => cat.id_categoria === c.id_categoria)){
+                AppState.categorieCache.push(c);
+            }
+        });
+
         let html = `
         <div class="col-12 mb-4 text-start">
             <button class="btn btn-outline-secondary btn-sm mb-3 fw-bold" onclick="caricaCampagne()">← Torna ai Preordini</button>
@@ -727,7 +757,7 @@
         aggiornaBarraStickyCarrello();
     }
 
-    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO CON FORMATO AGGIORNATO .webp
+    // 4. CATALOGO PRODOTTI E GRIGLIA FOTO (.webp)
     async function apriCatalogoProduttore(idProduttore, nomeProduttore, nomeCategoria, idCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
         AppState.categoriaAttivaId = idCategoria;
@@ -755,7 +785,6 @@
             const safeNome = p.nome.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const safeDesc = p.descrizione ? p.descrizione.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
             
-            // Richiamo nativo immagine WebP compressa
             const imgUrl = `${SUPABASE_URL}/storage/v1/object/public/foto/${cod}.webp`;
             const itemInCart = AppState.carrello.find(i => i.codice_articolo === cod && i.id_bottega == AppState.bottegaAttivaId);
             const qtaAttuale = itemInCart ? itemInCart.quantita : 0;
@@ -807,7 +836,7 @@
         aggiornaBarraStickyCarrello();
     }
 
-    // GALLERIA POP-UP FOTO CON SUPPORTO FILE COMPOSTI .webp
+    // GALLERIA POP-UP FOTO (.webp)
     function apriGalleria(codice, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore, pvp, descrizione) {
         document.getElementById('galleryModalLabel').innerText = nome;
         const carouselInner = document.getElementById('carousel-inner-content');
@@ -872,7 +901,7 @@
 
 
     /* ==========================================
-       LOGICA CARRELLO MULTI-LIVELLO E CHECKOUT
+       LOGICA CARRELLO E SALVATAGGIO IN CLOUD
        ========================================== */
 
     function modificaQtaGriglia(codice, delta, nome, prezzoNetto, idCategoria, idProduttore, nomeProduttore) {
@@ -954,6 +983,10 @@
                 });
             }
         }
+        
+        // Ogni volta che modifichiamo il carrello aggiorniamo la bozza sul server
+        salvaCarrelloInBozza();
+        
         aggiornaBarraStickyCarrello();
     }
 
@@ -963,7 +996,6 @@
             .reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
     }
 
-    // MONITORAGGIO BUDGET SPECIFICO DI CATEGORIA
     function aggiornaBarraStickyCarrello() {
         const totaleGlobale = AppState.carrello.reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
         const numeroPezzi = AppState.carrello.reduce((sum, i) => sum + i.quantita, 0);
@@ -996,7 +1028,7 @@
         document.getElementById('cart-badge').innerText = numeroPezzi;
     }
 
-    // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET PER CATEGORIA
+    // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET
     function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
@@ -1165,10 +1197,14 @@
 
     async function inviaOrdineDefinitivo() {
         if(!confirm("Confermi di voler inviare l'ordine definitivo a tutti i produttori?")) return;
+        
         document.getElementById('success-modal-msg').innerHTML = "Il tuo ordine è stato registrato ed inviato con successo ad <b>AltraQualità</b>!<br>Riceverai a breve un'email di riepilogo.";
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
+        // Svuotiamo il carrello in App e dal database (Bozza)
         AppState.carrello = [];
+        await salvaCarrelloInBozza();
+        
         aggiornaBarraStickyCarrello();
         navigaA('app-section');
         caricaCampagne();
