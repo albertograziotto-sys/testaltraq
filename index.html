@@ -1028,7 +1028,7 @@
         document.getElementById('cart-badge').innerText = numeroPezzi;
     }
 
-    // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET
+  // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET E PRODOTTI
     function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
@@ -1047,7 +1047,7 @@
         AppState.botteghe.forEach(b => {
             const mappaBudget = b.budget || {};
             for (let catId in mappaBudget) {
-                const limiteBudget = parseFloat(mappaBudget[catId]) || 0;
+                const limiteBudget = Number(mappaBudget[catId]) || 0;
                 if (limiteBudget > 0) {
                     const totSpesoCat = AppState.carrello
                         .filter(i => i.id_bottega == b.id_bottega && i.id_categoria == catId)
@@ -1076,17 +1076,21 @@
             
             ${avvisiBudgetHtml}
             
-            <p class="text-muted">Il sistema ha analizzato i tuoi ordini e raggruppato le spedizioni in base ai minimi richiesti. Scegli le destinazioni per le spedizioni condivise.</p>
+            <p class="text-muted">Il sistema ha analizzato i tuoi ordini e raggruppato le spedizioni in base ai minimi richiesti. Visualizza il dettaglio degli articoli ordinati per sede.</p>
         `;
 
         let tuttoSuperato = true;
 
         categorieNelCarrello.forEach(idCat => {
             const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || {nome_categoria: 'Sconosciuta', minimo_ordine: 0};
+            
+            // FIX BUG COMPARAZIONE: Forziamo la conversione in numero
+            const minOrdineInfo = Number(infoCat.minimo_ordine) || 0; 
+            
             const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
             const totaleCat = vociCat.reduce((sum, v) => sum + (v.quantita * v.prezzo), 0);
             
-            const minimoSuperato = totaleCat >= infoCat.minimo_ordine;
+            const minimoSuperato = totaleCat >= minOrdineInfo;
             if(!minimoSuperato) tuttoSuperato = false;
 
             html += `
@@ -1095,72 +1099,95 @@
                     <h4 class="fw-bold text-dark m-0">📁 ${infoCat.nome_categoria}</h4>
                     <div class="text-end mt-2 mt-md-0">
                         <span class="d-block fw-bold fs-5 mb-1 ${minimoSuperato ? 'text-success' : 'text-danger'}">Totale Rete: € ${totaleCat.toFixed(2).replace('.',',')}</span>
-                        ${minimoSuperato ? `<span class="badge bg-success fs-6">Minimo Raggiunto</span>` : `<span class="badge bg-danger fs-6">Mancano € ${(infoCat.minimo_ordine - totaleCat).toFixed(2).replace('.',',')} al minimo (€ ${infoCat.minimo_ordine})</span>`}
+                        ${minimoSuperato ? `<span class="badge bg-success fs-6">Minimo Raggiunto</span>` : `<span class="badge bg-danger fs-6">Mancano € ${(minOrdineInfo - totaleCat).toFixed(2).replace('.',',')} al minimo (€ ${minOrdineInfo})</span>`}
                     </div>
                 </div>
                 <div class="card-body p-4">`;
 
             if(!minimoSuperato) {
-                html += `<div class="alert alert-danger fw-bold shadow-sm mb-0">❌ Per questa categoria non hai raggiunto il minimo d'ordine globale. Torna indietro e aggiungi articoli per poter procedere.</div>`;
-            } else {
-                let spesaPerBottega = {};
-                vociCat.forEach(v => {
-                    if(!spesaPerBottega[v.id_bottega]) spesaPerBottega[v.id_bottega] = 0;
-                    spesaPerBottega[v.id_bottega] += (v.quantita * v.prezzo);
+                html += `<div class="alert alert-danger fw-bold shadow-sm mb-4">❌ Per questa categoria non hai raggiunto il minimo d'ordine globale. Torna indietro e aggiungi articoli per poter procedere.</div>`;
+            }
+
+            // Calcolo la spesa per bottega (mostro i prodotti anche se il minimo non è raggiunto)
+            let spesaPerBottega = {};
+            vociCat.forEach(v => {
+                if(!spesaPerBottega[v.id_bottega]) spesaPerBottega[v.id_bottega] = 0;
+                spesaPerBottega[v.id_bottega] += (v.quantita * v.prezzo);
+            });
+
+            let autonome = [];
+            let raggruppate = [];
+            let totRaggruppate = 0;
+
+            for (let idBottega in spesaPerBottega) {
+                const spesaSede = Number(spesaPerBottega[idBottega]);
+                // FIX BUG COMPARAZIONE: Utilizzo i valori forzati come Numeri
+                if(spesaSede >= minOrdineInfo) {
+                    autonome.push({id: idBottega, totale: spesaSede});
+                } else {
+                    raggruppate.push({id: idBottega, totale: spesaSede});
+                    totRaggruppate += spesaSede;
+                }
+            }
+
+            // Funzione di supporto per generare la lista di HTML dei prodotti di una sede
+            const generaListaProdotti = (idSede) => {
+                const items = vociCat.filter(i => i.id_bottega == idSede);
+                let listaHtml = `<div class="mt-3 p-2 bg-white rounded border border-secondary-subtle small"><strong class="text-dark d-block mb-2 border-bottom pb-1">Dettaglio Articoli:</strong><ul class="list-unstyled mb-0">`;
+                items.forEach(item => {
+                    listaHtml += `<li class="mb-1 pb-1 border-bottom border-light"><span class="text-muted fw-bold">${item.quantita}x</span> ${item.nome_produttore} - ${item.nome} <span class="float-end fw-semibold">€ ${(item.quantita * item.prezzo).toFixed(2).replace('.',',')}</span></li>`;
                 });
+                listaHtml += `</ul></div>`;
+                return listaHtml;
+            };
 
-                let autonome = [];
-                let raggruppate = [];
-                let totRaggruppate = 0;
+            html += `<div class="row">`;
 
-                for (let idBottega in spesaPerBottega) {
-                    if(spesaPerBottega[idBottega] >= infoCat.minimo_ordine) {
-                        autonome.push({id: idBottega, totale: spesaPerBottega[idBottega]});
-                    } else {
-                        raggruppate.push({id: idBottega, totale: spesaPerBottega[idBottega]});
-                        totRaggruppate += spesaPerBottega[idBottega];
-                    }
-                }
-
-                html += `<div class="row">`;
-
-                if(autonome.length > 0) {
-                    html += `<div class="col-md-6 mb-3">
-                        <div class="p-3 bg-white border border-success rounded shadow-sm h-100">
-                            <h6 class="fw-bold text-success border-bottom pb-2">📦 Spedizioni Indipendenti</h6>
-                            <ul class="list-group list-group-flush mb-0">`;
-                    autonome.forEach(a => {
-                        const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega || 'Sconosciuta';
-                        html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+            if(autonome.length > 0) {
+                html += `<div class="col-md-6 mb-3">
+                    <div class="p-3 bg-white border border-success rounded shadow-sm h-100">
+                        <h6 class="fw-bold text-success border-bottom pb-2">📦 Spedizioni Indipendenti</h6>
+                        <ul class="list-group list-group-flush mb-0">`;
+                autonome.forEach(a => {
+                    const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega || 'Sconosciuta';
+                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-3">
+                        <div class="d-flex justify-content-between align-items-center w-100">
                             <span><strong class="text-dark">${nomeB}</strong><br><small class="text-muted">Raggiunge il minimo da sola. Spedizione diretta.</small></span>
-                            <span class="fw-bold text-success">€ ${a.totale.toFixed(2).replace('.',',')}</span>
-                        </li>`;
-                    });
-                    html += `</ul></div></div>`;
-                }
+                            <span class="fw-bold text-success fs-5">€ ${a.totale.toFixed(2).replace('.',',')}</span>
+                        </div>
+                        ${generaListaProdotti(a.id)}
+                    </li>`;
+                });
+                html += `</ul></div></div>`;
+            }
 
-                if(raggruppate.length > 0) {
-                    html += `<div class="col-md-6 mb-3">
-                        <div class="p-3 bg-white border border-warning rounded shadow-sm h-100">
-                            <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Spedizioni Raggruppate</h6>
-                            <ul class="list-group list-group-flush mb-3">`;
-                    raggruppate.forEach(r => {
-                        const nomeB = AppState.botteghe.find(b => b.id_bottega == r.id)?.nome_bottega || 'Sconosciuta';
-                        html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between py-1">
-                            <span class="text-dark small">${nomeB}</span>
-                            <span class="text-muted small">€ ${r.totale.toFixed(2).replace('.',',')}</span>
-                        </li>`;
-                    });
-                    html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between border-top mt-2 pt-2">
-                        <strong class="text-dark">Totale Raggruppamento</strong>
-                        <strong class="text-brand">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
-                    </li></ul>`;
+            if(raggruppate.length > 0) {
+                html += `<div class="col-md-6 mb-3">
+                    <div class="p-3 bg-white border border-warning rounded shadow-sm h-100">
+                        <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Spedizioni Raggruppate ${!minimoSuperato ? '(In attesa)' : ''}</h6>
+                        <ul class="list-group list-group-flush mb-3">`;
+                raggruppate.forEach(r => {
+                    const nomeB = AppState.botteghe.find(b => b.id_bottega == r.id)?.nome_bottega || 'Sconosciuta';
+                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-3">
+                        <div class="d-flex justify-content-between align-items-center w-100">
+                            <span class="text-dark fw-bold">${nomeB}</span>
+                            <span class="text-muted fw-bold fs-6">€ ${r.totale.toFixed(2).replace('.',',')}</span>
+                        </div>
+                        ${generaListaProdotti(r.id)}
+                    </li>`;
+                });
+                html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between border-top mt-2 pt-3 bg-light rounded">
+                    <strong class="text-dark ms-2">Totale Raggruppamento</strong>
+                    <strong class="text-brand fs-5 me-2">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
+                </li></ul>`;
 
-                    html += `<div class="p-3 bg-light border rounded">
+                // Chiediamo dove spedire SOLO se il minimo è superato (altrimenti non possono inviare l'ordine)
+                if(minimoSuperato) {
+                    html += `<div class="p-3 bg-light border border-secondary-subtle rounded mt-3">
                         <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
                         <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="spedizione-cat-${idCat}">`;
                     
-                    if(totRaggruppate >= infoCat.minimo_ordine) {
+                    if(totRaggruppate >= minOrdineInfo) {
                         AppState.botteghe.forEach(b => {
                             html += `<option value="${b.id_bottega}">Spedisci alla sede di: ${b.nome_bottega}</option>`;
                         });
@@ -1173,12 +1200,12 @@
                     }
                     html += `</select>
                         <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate.</small>
-                    </div></div></div>`;
+                    </div>`;
                 }
-
-                html += `</div>`; 
+                html += `</div></div>`;
             }
-            html += `</div></div>`; 
+
+            html += `</div></div></div>`; 
         });
 
         const grandTotale = document.getElementById('cart-total-bar').innerHTML;
