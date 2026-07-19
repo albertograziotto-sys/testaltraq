@@ -446,11 +446,11 @@
         if (!botteghe || botteghe.length === 0) {
             // Se l'utente non ha botteghe, ne creiamo alcune di test
             const bottegheTest = [
-                { id_cliente: AppState.user.id, nome_bottega: 'Angoli di Mondo', indirizzo: '' },
-                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '' },
-                { id_cliente: AppState.user.id, nome_bottega: 'Acli San Gaetano', indirizzo: '' },
-                { id_cliente: AppState.user.id, nome_bottega: 'Unicomondo', indirizzo: '' },
-                { id_cliente: AppState.user.id, nome_bottega: 'Pace e Sviluppo', indirizzo: '' }
+                { id_cliente: AppState.user.id, nome_bottega: 'Angoli di Mondo', indirizzo: '', budget: 0 },
+                { id_cliente: AppState.user.id, nome_bottega: 'El Fontego di Mestre', indirizzo: '', budget: 0 },
+                { id_cliente: AppState.user.id, nome_bottega: 'Acli San Gaetano', indirizzo: '', budget: 0 },
+                { id_cliente: AppState.user.id, nome_bottega: 'Unicomondo', indirizzo: '', budget: 0 },
+                { id_cliente: AppState.user.id, nome_bottega: 'Pace e Sviluppo', indirizzo: '', budget: 0 }
             ];
             await clientDB.from('botteghe').insert(bottegheTest);
             let { data: bNew } = await clientDB.from('botteghe').select('*').eq('id_cliente', AppState.user.id).order('id_bottega');
@@ -474,10 +474,12 @@
             selector.value = AppState.botteghe[0].id_bottega;
             AppState.bottegaAttivaId = AppState.botteghe[0].id_bottega;
         }
+        aggiornaBarraStickyCarrello();
     }
 
     function cambiaBottegaAttiva() {
         AppState.bottegaAttivaId = document.getElementById('global-bottega-selector').value;
+        aggiornaBarraStickyCarrello();
         const vistaAttuale = document.querySelector('#app-container h3')?.innerText || '';
         if(!vistaAttuale.includes('Preordini') && !vistaAttuale.includes('Categoria')) {
             caricaCampagne(); // Riavvia al livello base per ricalcolare la UI
@@ -491,8 +493,9 @@
             html += `
             <div class="bg-light p-3 rounded mb-3 border border-secondary-subtle">
                 <div class="row align-items-end">
-                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
-                    <div class="col-md-5 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
+                    <div class="col-md-4 mb-2 mb-md-0"><label class="text-muted small fw-bold">Nome Bottega</label><input type="text" class="form-control fw-bold text-dark" id="edit-nome-${b.id_bottega}" value="${b.nome_bottega}"></div>
+                    <div class="col-md-4 mb-2 mb-md-0"><label class="text-muted small fw-bold">Indirizzo (Opzionale)</label><input type="text" class="form-control text-secondary" id="edit-ind-${b.id_bottega}" value="${b.indirizzo || ''}"></div>
+                    <div class="col-md-2 mb-2 mb-md-0"><label class="text-muted small fw-bold">Budget (€)</label><input type="number" step="0.01" class="form-control fw-bold text-danger" id="edit-budget-${b.id_bottega}" value="${b.budget || 0}"></div>
                     <div class="col-md-2 text-end"><button class="btn btn-outline-brand w-100 fw-bold shadow-sm" onclick="salvaModificaBottega(${b.id_bottega})">Salva</button></div>
                 </div>
             </div>`;
@@ -503,14 +506,17 @@
     async function salvaModificaBottega(idBottega) {
         const nNome = document.getElementById(`edit-nome-${idBottega}`).value.trim();
         const nInd = document.getElementById(`edit-ind-${idBottega}`).value.trim();
+        const nBudget = parseFloat(document.getElementById(`edit-budget-${idBottega}`).value) || 0;
+        
         if (!nNome) return alert("Il nome non può essere vuoto.");
-        const { error } = await clientDB.from('botteghe').update({ nome_bottega: nNome, indirizzo: nInd }).eq('id_bottega', idBottega);
+        
+        const { error } = await clientDB.from('botteghe').update({ nome_bottega: nNome, indirizzo: nInd, budget: nBudget }).eq('id_bottega', idBottega);
         if (error) alert("Errore: " + error.message);
         else {
             const b = AppState.botteghe.find(x => x.id_bottega === idBottega);
-            if (b) { b.nome_bottega = nNome; b.indirizzo = nInd; }
+            if (b) { b.nome_bottega = nNome; b.indirizzo = nInd; b.budget = nBudget; }
             popolaSelettoreBotteghe();
-            document.getElementById('success-modal-msg').innerText = "Bottega aggiornata con successo.";
+            document.getElementById('success-modal-msg').innerText = "Bottega e budget aggiornati con successo.";
             new bootstrap.Modal(document.getElementById('successModal')).show();
         }
     }
@@ -764,7 +770,6 @@
         aggiornaQuantitaCarrelloGlobale(codice, nome, qta, prezzoNetto, idCategoria, idProduttore, nomeProduttore);
         
         const btn = event.currentTarget;
-        const originalText = btn.innerText;
         btn.innerText = "✓ Fatto";
         btn.classList.add('bg-success', 'border-success');
         setTimeout(() => { 
@@ -809,11 +814,29 @@
     function aggiornaBarraStickyCarrello() {
         const totaleGlobale = AppState.carrello.reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
         const numeroPezzi = AppState.carrello.reduce((sum, i) => sum + i.quantita, 0);
-        document.getElementById('cart-total-bar').innerText = '€ ' + totaleGlobale.toFixed(2).replace('.',',');
+        
+        // Monitoraggio del budget per la bottega attiva
+        const bottegaAttiva = AppState.botteghe.find(b => b.id_bottega == AppState.bottegaAttivaId);
+        const budgetBottega = bottegaAttiva ? (parseFloat(bottegaAttiva.budget) || 0) : 0;
+        const totaleBottegaAttiva = AppState.carrello
+            .filter(i => i.id_bottega == AppState.bottegaAttivaId)
+            .reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
+
+        let badgeBudget = "";
+        if (budgetBottega > 0) {
+            const residuo = budgetBottega - totaleBottegaAttiva;
+            if (residuo < 0) {
+                badgeBudget = ` <span class="badge bg-danger ms-2">Sforato Budget di € ${Math.abs(residuo).toFixed(2).replace('.',',')}</span>`;
+            } else {
+                badgeBudget = ` <span class="badge bg-light text-dark border border-secondary-subtle ms-2">Residuo Negozio: € ${residuo.toFixed(2).replace('.',',')}</span>`;
+            }
+        }
+
+        document.getElementById('cart-total-bar').innerHTML = '€ ' + totaleGlobale.toFixed(2).replace('.',',') + badgeBudget;
         document.getElementById('cart-badge').innerText = numeroPezzi;
     }
 
-    // CHECKOUT LOGISTICO INTELLIGENTE
+    // CHECKOUT LOGISTICO E RIEPILOGO BUDGET INFORMATIVO
     function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
@@ -828,6 +851,21 @@
             return;
         }
 
+        // Generazione del blocco informativo per i budget (Solo avviso, non blocca l'ordine)
+        let avvisiBudgetHtml = "";
+        AppState.botteghe.forEach(b => {
+            if (b.budget > 0) {
+                const totBottega = AppState.carrello.filter(i => i.id_bottega == b.id_bottega).reduce((sum, item) => sum + (item.quantita * item.prezzo), 0);
+                if (totBottega > b.budget) {
+                    avvisiBudgetHtml += `
+                    <div class="alert alert-warning py-2 mb-2 border-warning-subtle text-dark fw-semibold small d-flex justify-content-between align-items-center shadow-sm">
+                        <span>⚠️ La bottega <strong>${b.nome_bottega}</strong> ha superato il budget impostato!</span>
+                        <span class="badge bg-danger font-monospace fs-6">€ ${totBottega.toFixed(2).replace('.',',')} / € ${b.budget.toFixed(2).replace('.',',')}</span>
+                    </div>`;
+                }
+            }
+        });
+
         const categorieNelCarrello = [...new Set(AppState.carrello.map(i => i.id_categoria))];
         
         let html = `
@@ -836,6 +874,9 @@
                 <h3 class="fw-bold text-brand m-0">Logistica e Spedizioni</h3>
                 <button class="btn btn-outline-secondary btn-sm fw-bold mt-2 mt-md-0" onclick="navigaA('app-section'); caricaCampagne();">← Torna ai Preordini</button>
             </div>
+            
+            ${avvisiBudgetHtml}
+            
             <p class="text-muted">Il sistema ha analizzato i tuoi ordini e raggruppato le spedizioni in base ai minimi richiesti. Scegli le destinazioni per le spedizioni condivise.</p>
         `;
 
@@ -941,7 +982,7 @@
             html += `</div></div>`; 
         });
 
-        const grandTotale = document.getElementById('cart-total-bar').innerText;
+        const grandTotale = document.getElementById('cart-total-bar').innerHTML;
         html += `
         <div class="col-12 text-end mt-4 bg-white p-4 rounded shadow-sm border border-secondary-subtle">
             <h3 class="fw-bold mb-3 text-dark">Totale Generale da confermare: <span class="text-brand">${grandTotale}</span></h3>
