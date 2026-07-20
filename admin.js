@@ -198,6 +198,8 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Esportazione...';
     btn.disabled = true;
 
+    console.log("IDs ordini selezionati:", ordiniSelezionatiIDs);
+
     // Recupera i dettagli degli ordini selezionati
     const { data: dettagli, error } = await supabaseClient
         .from('ordini_dettaglio')
@@ -205,7 +207,17 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
         .in('id_ordine', ordiniSelezionatiIDs);
 
     if (error) {
+        console.error("Errore Supabase dettagli:", error);
         alert("Errore durante il recupero dei dettagli: " + error.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        return;
+    }
+
+    console.log("Dettagli ricevuti da Supabase:", dettagli);
+
+    if (!dettagli || dettagli.length === 0) {
+        alert("Nessun articolo/dettaglio trovato su Supabase per gli ordini selezionati.");
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
@@ -213,26 +225,36 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
 
     // Creazione del contenuto CSV (con BOM per supportare gli accenti su Excel)
     let csvContent = "\uFEFF"; 
-    // Intestazioni delle colonne
     csvContent += "ID Ordine;Data;Cliente;Bottega;Categoria;Codice Articolo;Quantità;Prezzo Unitario;Totale Riga\n";
 
+    let righeAggiunte = 0;
+
     dettagli.forEach(dettaglio => {
-        // Troviamo la testata corrispondente in ordiniCorrenti per recuperare i nomi
-        const testata = ordiniCorrenti.find(o => o.id_ordine === dettaglio.id_ordine);
+        // Conversione forzata in stringa per evitare fallimenti da disallineamento Int/String/UUID
+        const testata = ordiniCorrenti.find(o => String(o.id_ordine) === String(dettaglio.id_ordine));
         
         if (testata) {
-            const dataOrdine = new Date(testata.data_ordine).toLocaleDateString('it-IT');
-            const cliente = testata.clienti ? testata.clienti.ragione_sociale.replace(/;/g, ',') : '';
-            const bottega = testata.botteghe ? testata.botteghe.nome_bottega.replace(/;/g, ',') : '';
-            const categoria = testata.categorie ? testata.categorie.nome_categoria.replace(/;/g, ',') : '';
+            const dataOrdine = testata.data_ordine ? new Date(testata.data_ordine).toLocaleDateString('it-IT') : '';
+            const cliente = testata.clienti ? String(testata.clienti.ragione_sociale).replace(/;/g, ',') : '';
+            const bottega = testata.botteghe ? String(testata.botteghe.nome_bottega).replace(/;/g, ',') : '';
+            const categoria = testata.categorie ? String(testata.categorie.nome_categoria).replace(/;/g, ',') : '';
             
-            const totaleRiga = (dettaglio.quantita * dettaglio.prezzo_unitario_applicato).toFixed(2);
-            const prezzoUnitario = Number(dettaglio.prezzo_unitario_applicato).toFixed(2);
+            const qta = dettaglio.quantita || 0;
+            const prezzo = dettaglio.prezzo_unitario_applicato || 0;
+            const totaleRiga = (qta * prezzo).toFixed(2);
+            const prezzoUnitario = Number(prezzo).toFixed(2);
 
-            // Costruiamo la riga separata da punto e virgola (standard europeo per CSV)
-            csvContent += `${dettaglio.id_ordine};${dataOrdine};"${cliente}";"${bottega}";"${categoria}";"${dettaglio.codice_articolo}";${dettaglio.quantita};${prezzoUnitario};${totaleRiga}\n`;
+            csvContent += `${dettaglio.id_ordine};${dataOrdine};"${cliente}";"${bottega}";"${categoria}";"${dettaglio.codice_articolo}";${qta};${prezzoUnitario};${totaleRiga}\n`;
+            righeAggiunte++;
         }
     });
+
+    if (righeAggiunte === 0) {
+        alert("Impossibile associare gli articoli alle testate degli ordini.");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        return;
+    }
 
     // Avvia il download del file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -244,7 +266,6 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
     link.click();
     document.body.removeChild(link);
 
-    // Ripristina il bottone
     btn.innerHTML = originalText;
     btn.disabled = false;
 });
