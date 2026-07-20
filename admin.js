@@ -12,16 +12,35 @@ const adminEmail = document.getElementById('admin-email');
 const loginError = document.getElementById('login-error');
 const tableBody = document.getElementById('orders-table-body');
 const filterCategoria = document.getElementById('filter-categoria');
+const searchCliente = document.getElementById('search-cliente');
 
 let ordiniCorrenti = [];
 
-// 3. Gestore dello Stato di Autenticazione
-supabaseClient.auth.onAuthStateChange((event, session) => {
+// 3. Gestore dello Stato di Autenticazione con blocco dei Clienti B2B
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
+        // Verifica di sicurezza: se l'utente esiste nella tabella "clienti", è un cliente e NON uno staff Admin!
+        const { data: cliente } = await supabaseClient
+            .from('clienti')
+            .select('id')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+        if (cliente) {
+            // È un account cliente: effettua subito il logout e nega l'accesso
+            await supabaseClient.auth.signOut();
+            loginError.textContent = "Accesso Negato: Questo account appartiene a un cliente B2B. Utilizza il portale principale.";
+            loginError.classList.remove('d-none');
+            return;
+        }
+
+        // È un utente Staff
+        loginError.classList.add('d-none');
         loginSection.classList.add('d-none');
         dashboardSection.classList.remove('d-none');
         userMenu.classList.remove('d-none');
         adminEmail.textContent = session.user.email;
+        
         initDashboard();
     } else {
         loginSection.classList.remove('d-none');
@@ -33,6 +52,8 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 // 4. Logica di Login e Logout
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    loginError.classList.add('d-none');
+    
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
@@ -42,7 +63,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         loginError.textContent = "Errore di accesso: " + error.message;
         loginError.classList.remove('d-none');
     } else {
-        loginError.classList.add('d-none');
         document.getElementById('login-form').reset();
     }
 });
@@ -57,7 +77,7 @@ async function initDashboard() {
     await fetchOrdini();
 }
 
-// 6. Recupero Categorie (per la select dei filtri)
+// 6. Recupero Categorie (per il filtro)
 async function fetchCategorie() {
     const { data, error } = await supabaseClient
         .from('categorie')
@@ -66,7 +86,7 @@ async function fetchCategorie() {
 
     if (error) return;
 
-    filterCategoria.innerHTML = '<option value="">Tutte le categorie</option>';
+    filterCategoria.innerHTML = '<option value="">Tutti i moduli</option>';
     data.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat.id_categoria;
@@ -77,7 +97,7 @@ async function fetchCategorie() {
 
 // 7. Recupero Ordini in Ingresso
 async function fetchOrdini() {
-    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Caricamento in corso...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><span class="spinner-border spinner-border-sm text-brand"></span> Caricamento ordini in corso...</td></tr>';
 
     const { data, error } = await supabaseClient
         .from('ordini_testata')
@@ -94,7 +114,7 @@ async function fetchOrdini() {
         .order('data_ordine', { ascending: false });
 
     if (error) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Errore nel caricamento.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Errore nel caricamento dei dati.</td></tr>';
         return;
     }
 
@@ -109,7 +129,7 @@ function renderTabella(ordini) {
     document.getElementById('select-all').checked = false;
     
     if (ordini.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Nessun nuovo ordine da processare.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Nessun ordine trovato.</td></tr>';
         return;
     }
 
@@ -117,32 +137,42 @@ function renderTabella(ordini) {
         const dataFormattata = new Date(ordine.data_ordine).toLocaleDateString('it-IT');
         const clienteNome = ordine.clienti ? ordine.clienti.ragione_sociale : 'Sconosciuto';
         const bottegaNome = ordine.botteghe ? ordine.botteghe.nome_bottega : 'Sconosciuta';
-        const categoriaNome = ordine.categorie ? ordine.categorie.nome_categoria : 'Sconosciuta';
+        const categoriaNome = ordine.categorie ? ordine.categorie.nome_categoria : 'Sconosciuto';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><input type="checkbox" class="order-checkbox" value="${ordine.id_ordine}"></td>
+            <td><input type="checkbox" class="order-checkbox form-check-input" value="${ordine.id_ordine}"></td>
             <td>${dataFormattata}</td>
             <td><strong>${clienteNome}</strong></td>
             <td>${bottegaNome}</td>
             <td><span class="badge bg-secondary">${categoriaNome}</span></td>
-            <td>-</td>
-            <td><span class="badge bg-warning text-dark">Da processare</span></td>
+            <td><span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> In Attesa</span></td>
         `;
         tableBody.appendChild(tr);
     });
 }
 
-// 9. Gestione Filtro per Categoria
-filterCategoria.addEventListener('change', (e) => {
-    const categoriaSelezionata = e.target.value;
-    if (categoriaSelezionata === "") {
-        renderTabella(ordiniCorrenti);
-    } else {
-        const ordiniFiltrati = ordiniCorrenti.filter(o => String(o.id_categoria) === String(categoriaSelezionata));
-        renderTabella(ordiniFiltrati);
-    }
-});
+// 9. Logica Combinata di Filtro (Ricerca Testuale + Categoria)
+function applicaFiltri() {
+    const queryStr = searchCliente.value.toLowerCase().trim();
+    const catSelezionata = filterCategoria.value;
+
+    const ordiniFiltrati = ordiniCorrenti.filter(ordine => {
+        const coincideCategoria = catSelezionata === "" || String(ordine.id_categoria) === String(catSelezionata);
+        
+        const ragioneSociale = ordine.clienti?.ragione_sociale?.toLowerCase() || '';
+        const nomeBottega = ordine.botteghe?.nome_bottega?.toLowerCase() || '';
+        
+        const coincideRicerca = queryStr === "" || ragioneSociale.includes(queryStr) || nomeBottega.includes(queryStr);
+
+        return coincideCategoria && coincideRicerca;
+    });
+
+    renderTabella(ordiniFiltrati);
+}
+
+filterCategoria.addEventListener('change', applicaFiltri);
+searchCliente.addEventListener('input', applicaFiltri);
 
 // 10. Gestione Checkbox "Seleziona Tutti"
 document.getElementById('select-all').addEventListener('change', (e) => {
@@ -198,39 +228,31 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Esportazione...';
     btn.disabled = true;
 
-    console.log("IDs ordini selezionati:", ordiniSelezionatiIDs);
-
-    // Recupera i dettagli degli ordini selezionati
     const { data: dettagli, error } = await supabaseClient
         .from('ordini_dettaglio')
         .select('*')
         .in('id_ordine', ordiniSelezionatiIDs);
 
     if (error) {
-        console.error("Errore Supabase dettagli:", error);
         alert("Errore durante il recupero dei dettagli: " + error.message);
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
     }
 
-    console.log("Dettagli ricevuti da Supabase:", dettagli);
-
     if (!dettagli || dettagli.length === 0) {
-        alert("Nessun articolo/dettaglio trovato su Supabase per gli ordini selezionati.");
+        alert("Nessun articolo/dettaglio trovato per gli ordini selezionati.");
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
     }
 
-    // Creazione del contenuto CSV (con BOM per supportare gli accenti su Excel)
     let csvContent = "\uFEFF"; 
     csvContent += "ID Ordine;Data;Cliente;Bottega;Categoria;Codice Articolo;Quantità;Prezzo Unitario;Totale Riga\n";
 
     let righeAggiunte = 0;
 
     dettagli.forEach(dettaglio => {
-        // Conversione forzata in stringa per evitare fallimenti da disallineamento Int/String/UUID
         const testata = ordiniCorrenti.find(o => String(o.id_ordine) === String(dettaglio.id_ordine));
         
         if (testata) {
@@ -250,13 +272,12 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
     });
 
     if (righeAggiunte === 0) {
-        alert("Impossibile associare gli articoli alle testate degli ordini.");
+        alert("Impossibile associare gli articoli agli ordini selezionati.");
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
     }
 
-    // Avvia il download del file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
