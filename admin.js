@@ -2,7 +2,6 @@
 const SUPABASE_URL = 'https://tmaxqbosibkxrghgwfzi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
 
-// ERRORE CORRETTO: Chiamiamo la variabile supabaseClient invece di supabase
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 2. Riferimenti alla UI
@@ -14,21 +13,17 @@ const loginError = document.getElementById('login-error');
 const tableBody = document.getElementById('orders-table-body');
 const filterCategoria = document.getElementById('filter-categoria');
 
-// Variabile globale per salvare gli ordini in memoria (utile per i filtri e l'export)
 let ordiniCorrenti = [];
 
 // 3. Gestore dello Stato di Autenticazione
 supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session) {
-        // Mostra Dashboard
         loginSection.classList.add('d-none');
         dashboardSection.classList.remove('d-none');
         userMenu.classList.remove('d-none');
         adminEmail.textContent = session.user.email;
-        
         initDashboard();
     } else {
-        // Mostra Login
         loginSection.classList.remove('d-none');
         dashboardSection.classList.add('d-none');
         userMenu.classList.add('d-none');
@@ -69,12 +64,8 @@ async function fetchCategorie() {
         .select('id_categoria, nome_categoria')
         .order('nome_categoria');
 
-    if (error) {
-        console.error("Errore recupero categorie:", error);
-        return;
-    }
+    if (error) return;
 
-    // Pulisce e popola la select mantenendo la prima opzione
     filterCategoria.innerHTML = '<option value="">Tutte le categorie</option>';
     data.forEach(cat => {
         const option = document.createElement('option');
@@ -103,8 +94,7 @@ async function fetchOrdini() {
         .order('data_ordine', { ascending: false });
 
     if (error) {
-        console.error("Errore recupero ordini:", error);
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Errore nel caricamento dei dati.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Errore nel caricamento.</td></tr>';
         return;
     }
 
@@ -116,6 +106,9 @@ async function fetchOrdini() {
 function renderTabella(ordini) {
     tableBody.innerHTML = '';
     
+    // Assicuriamoci che il "Seleziona Tutti" sia deselezionato quando ricarichiamo la tabella
+    document.getElementById('select-all').checked = false;
+    
     if (ordini.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Nessun nuovo ordine da processare.</td></tr>';
         return;
@@ -123,9 +116,9 @@ function renderTabella(ordini) {
 
     ordini.forEach(ordine => {
         const dataFormattata = new Date(ordine.data_ordine).toLocaleDateString('it-IT');
-        const clienteNome = ordine.clienti ? ordine.clienti.ragione_sociale : 'Cliente sconosciuto';
-        const bottegaNome = ordine.botteghe ? ordine.botteghe.nome_bottega : 'Bottega sconosciuta';
-        const categoriaNome = ordine.categorie ? ordine.categorie.nome_categoria : 'Categoria sconosciuta';
+        const clienteNome = ordine.clienti ? ordine.clienti.ragione_sociale : 'Sconosciuto';
+        const bottegaNome = ordine.botteghe ? ordine.botteghe.nome_bottega : 'Sconosciuta';
+        const categoriaNome = ordine.categorie ? ordine.categorie.nome_categoria : 'Sconosciuta';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -144,7 +137,6 @@ function renderTabella(ordini) {
 // 9. Gestione Filtro per Categoria
 filterCategoria.addEventListener('change', (e) => {
     const categoriaSelezionata = e.target.value;
-    
     if (categoriaSelezionata === "") {
         renderTabella(ordiniCorrenti);
     } else {
@@ -152,6 +144,7 @@ filterCategoria.addEventListener('change', (e) => {
         renderTabella(ordiniFiltrati);
     }
 });
+
 // 10. Gestione Checkbox "Seleziona Tutti"
 document.getElementById('select-all').addEventListener('change', (e) => {
     const checkboxes = document.querySelectorAll('.order-checkbox');
@@ -160,7 +153,6 @@ document.getElementById('select-all').addEventListener('change', (e) => {
 
 // 11. Azione: Segna come Presi in Carico
 document.getElementById('btn-mark-downloaded').addEventListener('click', async () => {
-    // Raccoglie tutti gli ID degli ordini selezionati
     const checkboxes = document.querySelectorAll('.order-checkbox:checked');
     const ordiniSelezionati = Array.from(checkboxes).map(cb => cb.value);
 
@@ -172,28 +164,22 @@ document.getElementById('btn-mark-downloaded').addEventListener('click', async (
     const conferma = confirm(`Stai per segnare ${ordiniSelezionati.length} ordini come presi in carico. Procedere?`);
     if (!conferma) return;
 
-    // Cambia il testo del bottone per dare feedback visivo
     const btn = document.getElementById('btn-mark-downloaded');
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aggiornamento...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Aggiornamento...';
     btn.disabled = true;
 
-    // Esegue l'aggiornamento multiplo su Supabase usando .in()
     const { error } = await supabaseClient
         .from('ordini_testata')
         .update({ flag_scaricato: true })
         .in('id_ordine', ordiniSelezionati);
 
     if (error) {
-        console.error("Errore durante l'aggiornamento:", error);
         alert("Errore durante l'aggiornamento: " + error.message);
     } else {
-        // Deseleziona il checkbox principale e ricarica la tabella
-        document.getElementById('select-all').checked = false;
         await fetchOrdini(); 
     }
 
-    // Ripristina il bottone
     btn.innerHTML = originalText;
     btn.disabled = false;
 });
