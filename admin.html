@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AltraQualità - Pannello Admin B2B</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        /* Piccole utility per la UI */
+        body { background-color: #f8f9fa; }
+        .d-none { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">📦 AltraQualità Admin</a>
+            <div class="d-flex" id="user-menu" class="d-none">
+                <span class="navbar-text me-3" id="admin-email"></span>
+                <button class="btn btn-outline-light btn-sm" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <!-- SEZIONE 1: LOGIN -->
+        <div id="login-section" class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card shadow-sm mt-5">
+                    <div class="card-body">
+                        <h4 class="card-title text-center mb-4">Accesso Staff</h4>
+                        <form id="login-form">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" id="email" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <input type="password" id="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Accedi</button>
+                        </form>
+                        <div id="login-error" class="alert alert-danger mt-3 d-none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEZIONE 2: DASHBOARD ORDINI -->
+        <div id="dashboard-section" class="d-none">
+            
+            <!-- Header Dashboard & Filtri -->
+            <div class="row mb-3 align-items-end">
+                <div class="col-md-4">
+                    <h2 class="mb-0">Ordini in Ingresso</h2>
+                    <p class="text-muted">Ordini da processare e inviare ai fornitori</p>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Filtra per Categoria (Modulo)</label>
+                    <select id="filter-categoria" class="form-select">
+                        <option value="">Tutte le categorie</option>
+                        <!-- Popolato dinamicamente da Supabase -->
+                    </select>
+                </div>
+                <div class="col-md-5 text-end">
+                    <button id="btn-export-csv" class="btn btn-success me-2">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Esporta CSV
+                    </button>
+                    <button id="btn-mark-downloaded" class="btn btn-warning">
+                        <i class="bi bi-check2-all"></i> Segna come Presi in Carico
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabella Ordini -->
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th><input type="checkbox" id="select-all"></th>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>Bottega</th>
+                                    <th>Categoria</th>
+                                    <th>Articoli Tot.</th>
+                                    <th>Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body">
+                                <!-- Le righe verranno generate dinamicamente con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- Fine Dashboard -->
+
+    </div>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Custom Logic -->
+    <script src="admin.js"></script>
+</body>
+</html>
