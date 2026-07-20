@@ -1218,26 +1218,19 @@
                     <strong class="text-brand fs-5 me-2">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
                 </li></ul>`;
 
-                if(minimoSuperato) {
-                    html += `<div class="p-3 bg-light border border-secondary-subtle rounded mt-3">
-                        <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
-                        <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="spedizione-cat-${idCat}">`;
-                    
-                    if(totRaggruppate >= minOrdineInfo) {
-                        AppState.botteghe.forEach(b => {
-                            html += `<option value="${b.id_bottega}">Spedisci alla sede di: ${b.nome_bottega}</option>`;
-                        });
-                    } else {
-                        html += `<option value="" disabled selected>Devi unirti a una sede forte...</option>`;
-                        autonome.forEach(a => {
-                            const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega;
-                            html += `<option value="${a.id}">Unisci al pacco diretto a: ${nomeB}</option>`;
-                        });
-                    }
-                    html += `</select>
-                        <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Fle distinte cartacee all'interno saranno mantenute separate.</small>
-                    </div>`;
-                }
+                html += `<div class="p-3 bg-light border border-secondary-subtle rounded mt-3">
+                    <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
+                    <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="spedizione-cat-${idCat}">
+                        <option value="" disabled selected>Seleziona sede di destinazione...</option>`;
+                
+                AppState.botteghe.forEach(b => {
+                    html += `<option value="${b.id_bottega}">Spedisci alla sede di: ${b.nome_bottega}</option>`;
+                });
+
+                html += `</select>
+                    <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate.</small>
+                </div>`;
+                
                 html += `</div></div>`;
             }
 
@@ -1257,7 +1250,7 @@
                 <div class="form-check">
                     <input class="form-check-input border-warning" type="checkbox" id="force-submit-checkbox" onchange="toggleForzaInvio()" style="cursor: pointer;">
                     <label class="form-check-label fw-bold text-dark" for="force-submit-checkbox" style="cursor: pointer;">
-                        Sono consapevole di non aver raggiunto il minimo in alcune categorie,<br>ma richiedo comunque l'invio dell'ordine.
+                        Invia anche sotto minimo d'ordine
                     </label>
                 </div>
             </div>
