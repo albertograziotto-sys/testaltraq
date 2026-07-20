@@ -106,7 +106,6 @@ async function fetchOrdini() {
 function renderTabella(ordini) {
     tableBody.innerHTML = '';
     
-    // Assicuriamoci che il "Seleziona Tutti" sia deselezionato quando ricarichiamo la tabella
     document.getElementById('select-all').checked = false;
     
     if (ordini.length === 0) {
@@ -180,6 +179,72 @@ document.getElementById('btn-mark-downloaded').addEventListener('click', async (
         await fetchOrdini(); 
     }
 
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+});
+
+// 12. Azione: Esporta in CSV
+document.getElementById('btn-export-csv').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const ordiniSelezionatiIDs = Array.from(checkboxes).map(cb => cb.value);
+
+    if (ordiniSelezionatiIDs.length === 0) {
+        alert("Seleziona almeno un ordine da esportare.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-export-csv');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Esportazione...';
+    btn.disabled = true;
+
+    // Recupera i dettagli degli ordini selezionati
+    const { data: dettagli, error } = await supabaseClient
+        .from('ordini_dettaglio')
+        .select('*')
+        .in('id_ordine', ordiniSelezionatiIDs);
+
+    if (error) {
+        alert("Errore durante il recupero dei dettagli: " + error.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        return;
+    }
+
+    // Creazione del contenuto CSV (con BOM per supportare gli accenti su Excel)
+    let csvContent = "\uFEFF"; 
+    // Intestazioni delle colonne
+    csvContent += "ID Ordine;Data;Cliente;Bottega;Categoria;Codice Articolo;Quantità;Prezzo Unitario;Totale Riga\n";
+
+    dettagli.forEach(dettaglio => {
+        // Troviamo la testata corrispondente in ordiniCorrenti per recuperare i nomi
+        const testata = ordiniCorrenti.find(o => o.id_ordine === dettaglio.id_ordine);
+        
+        if (testata) {
+            const dataOrdine = new Date(testata.data_ordine).toLocaleDateString('it-IT');
+            const cliente = testata.clienti ? testata.clienti.ragione_sociale.replace(/;/g, ',') : '';
+            const bottega = testata.botteghe ? testata.botteghe.nome_bottega.replace(/;/g, ',') : '';
+            const categoria = testata.categorie ? testata.categorie.nome_categoria.replace(/;/g, ',') : '';
+            
+            const totaleRiga = (dettaglio.quantita * dettaglio.prezzo_unitario_applicato).toFixed(2);
+            const prezzoUnitario = Number(dettaglio.prezzo_unitario_applicato).toFixed(2);
+
+            // Costruiamo la riga separata da punto e virgola (standard europeo per CSV)
+            csvContent += `${dettaglio.id_ordine};${dataOrdine};"${cliente}";"${bottega}";"${categoria}";"${dettaglio.codice_articolo}";${dettaglio.quantita};${prezzoUnitario};${totaleRiga}\n`;
+        }
+    });
+
+    // Avvia il download del file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `esportazione_ordini_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Ripristina il bottone
     btn.innerHTML = originalText;
     btn.disabled = false;
 });
