@@ -193,7 +193,7 @@
         <div id="profile-section" style="display: none;">
           <div class="full-page-card border-top-0" style="max-width: 800px; margin: 0;">
             <h3 class="mb-1 fw-bold text-brand">Il Tuo Profilo</h3>
-            <p class="text-muted small mb-4">Gestisci i tuoi dati aziendali, le deine botteghe e i budget per categoria.</p>
+            <p class="text-muted small mb-4">Gestisci i tuoi dati aziendali, le tue botteghe e i budget per categoria.</p>
             
             <div class="row mb-4">
               <div class="col-md-6 mb-3">
@@ -1272,14 +1272,12 @@
         const msgErrore = document.getElementById('msg-errore-minimi');
         
         if (isChecked) {
-            // Sblocca il pulsante e lo colora di arancione/warning
             btn.disabled = false;
             btn.classList.remove('btn-secondary');
             btn.classList.add('btn-warning', 'text-dark', 'shadow-sm');
             btn.innerHTML = '⚠️ Conferma e Invia Sotto Minimo';
             if(msgErrore) msgErrore.style.display = 'none';
         } else {
-            // Blocca di nuovo il pulsante se l'utente toglie la spunta
             btn.disabled = true;
             btn.classList.remove('btn-warning', 'text-dark', 'shadow-sm');
             btn.classList.add('btn-secondary');
@@ -1288,19 +1286,18 @@
         }
     }
 
-    // --- NUOVA LOGICA DI INVIO ORDINI AL DATABASE (DIVISI PER BOTTEGA E CATEGORIA) ---
+    // --- NUOVA LOGICA DI INVIO ORDINI AL DATABASE ---
     async function inviaOrdineDefinitivo() {
         if(!confirm("Confermi di voler inviare l'ordine definitivo? Verranno generati ordini separati per ogni modulo e singola bottega.")) return;
         
         const btn = document.getElementById('btn-conferma-ordine');
         if (btn) {
             btn.disabled = true;
-            btn.innerText = "Creazione ordini in database...";
+            btn.innerText = "Salvataggio ordini nel database...";
         }
 
-        // 1. Raggruppiamo il carrello per Categoria E per Bottega
+        // Raggruppiamo il carrello per Categoria E per Bottega
         const ordiniRaggruppati = {};
-        
         AppState.carrello.forEach(item => {
             const key = `${item.id_categoria}_${item.id_bottega}`;
             if (!ordiniRaggruppati[key]) {
@@ -1316,35 +1313,33 @@
         let errori = 0;
         let testateCreate = 0;
 
-        // 2. Iteriamo sui gruppi creati e facciamo gli inserimenti
         for (const key in ordiniRaggruppati) {
             const gruppo = ordiniRaggruppati[key];
 
-            // Recuperiamo il budget impostato per questa bottega e categoria (se esiste)
             const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == gruppo.id_bottega);
             let budget = null;
             if (bottegaInfo && bottegaInfo.budget && bottegaInfo.budget[gruppo.id_categoria]) {
                 budget = parseFloat(bottegaInfo.budget[gruppo.id_categoria]);
             }
 
-            // 3. Creiamo la Testata dell'ordine rispettando le colonne di Supabase
+            // CREAZIONE TESTATA
             const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
                 id_cliente: AppState.user.id,
-                id_bottega: parseInt(gruppo.id_bottega),
-                id_categoria: parseInt(gruppo.id_categoria),
+                id_bottega: gruppo.id_bottega,
+                id_categoria: gruppo.id_categoria,
                 budget_impostato: budget || null
             }]).select().single();
 
             if (errTestata) {
-                console.error(`Errore testata ${key}:`, errTestata.message);
+                console.error(`Errore Supabase nella Testata:`, errTestata.message);
+                alert("ERRORE DATABASE: " + errTestata.message);
                 errori++;
-                continue; // Passiamo al gruppo successivo se fallisce
+                continue; 
             }
 
-            // Ricaviamo l'id_ordine appena generato da Supabase
             const idOrdineGenerato = testata.id_ordine;
 
-            // 4. Prepariamo le righe di dettaglio
+            // PREPARAZIONE DETTAGLI
             const righeDettaglio = gruppo.items.map(item => ({
                 id_ordine: idOrdineGenerato,
                 codice_articolo: item.codice_articolo,
@@ -1352,25 +1347,24 @@
                 prezzo_unitario_applicato: item.prezzo
             }));
 
-            // 5. Inseriamo i dettagli per questo specifico ordine
+            // INSERIMENTO DETTAGLI
             const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
 
             if (errDettagli) {
-                console.error(`Errore dettagli ${key}:`, errDettagli.message);
+                console.error(`Errore Supabase nei Dettagli:`, errDettagli.message);
+                alert("ERRORE DETTAGLI: " + errDettagli.message);
                 errori++;
             } else {
                 testateCreate++;
             }
         }
 
-        // 6. Verifica finale
         if (errori > 0) {
-            alert(`Si è verificato qualche errore. ${testateCreate} ordini salvati, ma ${errori} hanno fallito. Controlla il database e riprova l'invio per i rimanenti.`);
             if (btn) { btn.disabled = false; btn.innerHTML = "Riprova Invio Falliti"; }
             return;
         }
 
-        // 7. Tutto perfetto! Mostriamo il successo e svuotiamo il carrello
+        // Se arriva qui, l'inserimento è stato perfetto
         document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini</b> (divisi per modulo e bottega) sono stati registrati con successo in Supabase!`;
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
@@ -1378,14 +1372,107 @@
         await salvaCarrelloInBozza();
         
         aggiornaBarraStickyCarrello();
-        navigaA('app-section');
-        caricaCampagne();
+        navigaA('orders-section'); 
     }
 
-    /* STORICO ORDINI */
+    // --- NUOVA LOGICA DI LETTURA STORICO ORDINI ---
     async function caricaStoricoOrdini() {
         const container = document.getElementById('orders-list-container');
-        container.innerHTML = '<p class="text-muted fw-bold mt-4">Lo storico ordini verrà mostrato qui.</p>';
+        container.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-brand"></div><p class="mt-2 text-muted fw-bold">Caricamento ordini dal database...</p></div>';
+
+        // 1. Peschiamo tutte le testate di questo cliente
+        const { data: testate, error: errT } = await clientDB.from('ordini_testata')
+            .select('*')
+            .eq('id_cliente', AppState.user.id)
+            .order('data_ordine', { ascending: false });
+
+        if (errT) {
+            container.innerHTML = `<p class="text-danger fw-bold">Errore di lettura ordini: ${errT.message}</p>`;
+            return;
+        }
+
+        if (!testate || testate.length === 0) {
+            container.innerHTML = `<div class="alert alert-light text-center py-5 border">
+                <h4 class="text-muted fw-bold mb-3">Nessun ordine trovato</h4>
+                <p>Non hai ancora effettuato ordini. Vai alla vetrina per iniziare!</p>
+                <button class="btn btn-brand mt-2 fw-bold px-4" onclick="navigaA('app-section'); caricaCampagne();">Vai alla Vetrina</button>
+            </div>`;
+            return;
+        }
+
+        // 2. Peschiamo i dettagli associati a queste testate
+        const orderIds = testate.map(t => t.id_ordine);
+        const { data: dettagli, error: errD } = await clientDB.from('ordini_dettaglio')
+            .select('*')
+            .in('id_ordine', orderIds);
+
+        if (errD) {
+            container.innerHTML = `<p class="text-danger fw-bold">Errore lettura dettagli: ${errD.message}</p>`;
+            return;
+        }
+
+        // 3. Disegniamo le ricevute per ogni ordine
+        let html = '';
+        testate.forEach(t => {
+            const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == t.id_bottega);
+            const nomeBottega = bottegaInfo ? bottegaInfo.nome_bottega : 'Bottega ID: ' + t.id_bottega;
+            
+            const catInfo = AppState.categorieCache.find(c => c.id_categoria == t.id_categoria);
+            const nomeCat = catInfo ? catInfo.nome_categoria : 'Categoria ID: ' + t.id_categoria;
+            
+            const dataFormattata = new Date(t.data_ordine).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            const righeOrdine = dettagli.filter(d => d.id_ordine === t.id_ordine);
+            const totaleCalcolato = righeOrdine.reduce((sum, r) => sum + (r.quantita * r.prezzo_unitario_applicato), 0);
+
+            html += `
+            <div class="card shadow-sm border-0 mb-4 bg-light border-start border-4 border-brand">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap">
+                    <div>
+                        <h5 class="fw-bold text-dark m-0">Ordine #${t.id_ordine}</h5>
+                        <small class="text-muted">${dataFormattata}</small>
+                    </div>
+                    <div class="text-end mt-2 mt-md-0">
+                        <span class="badge bg-brand fs-6 mb-1">Totale: € ${totaleCalcolato.toFixed(2).replace('.',',')}</span><br>
+                        ${t.flag_scaricato ? '<span class="badge bg-success small">Ricevuto in Sede</span>' : '<span class="badge bg-secondary small">Inviato al Sistema</span>'}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-6"><span class="text-muted small d-block">Bottega Destinazione:</span><strong class="text-dark">${nomeBottega}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo/Categoria:</span><strong class="text-dark">${nomeCat}</strong></div>
+                    </div>
+                    <div class="table-responsive bg-white rounded border">
+                        <table class="table table-sm table-borderless mb-0">
+                            <thead class="border-bottom bg-light">
+                                <tr class="text-muted small">
+                                    <th class="py-2 px-3">Codice Articolo</th>
+                                    <th class="text-center py-2">Q.tà</th>
+                                    <th class="text-end py-2">Prezzo Netto</th>
+                                    <th class="text-end py-2 px-3">Subtotale</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+            
+            righeOrdine.forEach(r => {
+                const sub = r.quantita * r.prezzo_unitario_applicato;
+                html += `
+                                <tr class="border-bottom border-light">
+                                    <td class="fw-semibold text-dark px-3 align-middle">${r.codice_articolo}</td>
+                                    <td class="text-center align-middle">${r.quantita}</td>
+                                    <td class="text-end text-muted align-middle">€ ${Number(r.prezzo_unitario_applicato).toFixed(2).replace('.',',')}</td>
+                                    <td class="text-end fw-bold text-dark px-3 align-middle">€ ${sub.toFixed(2).replace('.',',')}</td>
+                                </tr>`;
+            });
+
+            html += `       </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        container.innerHTML = html;
     }
   </script>
 </body>
