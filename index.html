@@ -1043,7 +1043,7 @@
         }
     }
 
-    // CHECKOUT LOGISTICO E RIEPILOGO AVVISI BUDGET E PRODOTTI MODIFICABILI
+    // CHECKOUT LOGISTICO A 4 CASI
     function mostraRiepilogoCarrello() {
         navigaA('checkout-section');
         const app = document.getElementById('checkout-section');
@@ -1091,7 +1091,7 @@
             
             ${avvisiBudgetHtml}
             
-            <p class="text-muted">Analizza i tuoi ordini e raggruppa le spedizioni in base ai minimi. Puoi aggiustare le quantità qui sotto se ti manca poco per raggiungere una soglia.</p>
+            <p class="text-muted">Riepilogo delle spedizioni organizzate secondo i minimi di categoria per la rete di botteghe.</p>
         `;
 
         let tuttoSuperato = true;
@@ -1118,28 +1118,18 @@
                 <div class="card-body p-4">`;
 
             if(!minimoSuperato) {
-                html += `<div class="alert alert-danger fw-bold shadow-sm mb-4">❌ Non hai raggiunto il minimo d'ordine globale. Aggiusta le quantità qui sotto o torna ai preordini per procedere.</div>`;
+                html += `<div class="alert alert-danger fw-bold shadow-sm mb-4">❌ Il totale di categoria per la rete non raggiunge il minimo d'ordine. Aggiusta le quantità o forza l'invio.</div>`;
             }
 
             let spesaPerBottega = {};
             vociCat.forEach(v => {
-                if(!spesaPerBottega[v.id_bottega]) spesaPerBottega[v.id_bottega] = 0;
-                spesaPerBottega[v.id_bottega] += (v.quantita * v.prezzo);
+                spesaPerBottega[v.id_bottega] = (spesaPerBottega[v.id_bottega] || 0) + (v.quantita * v.prezzo);
             });
 
-            let autonome = [];
-            let raggruppate = [];
-            let totRaggruppate = 0;
-
-            for (let idBottega in spesaPerBottega) {
-                const spesaSede = Number(spesaPerBottega[idBottega]);
-                if(spesaSede >= minOrdineInfo) {
-                    autonome.push({id: idBottega, totale: spesaSede});
-                } else {
-                    raggruppate.push({id: idBottega, totale: spesaSede});
-                    totRaggruppate += spesaSede;
-                }
-            }
+            const allBottegheCat = Object.keys(spesaPerBottega);
+            const sopraMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] >= minOrdineInfo && minOrdineInfo > 0);
+            const sottoMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] < minOrdineInfo || minOrdineInfo === 0);
+            const totSottoMinimo = sottoMinimo.reduce((sum, idB) => sum + spesaPerBottega[idB], 0);
 
             const generaListaProdottiModificabile = (idSede) => {
                 const items = vociCat.filter(i => i.id_bottega == idSede);
@@ -1147,7 +1137,6 @@
                 
                 items.forEach(item => {
                     const subtotale = (item.quantita * item.prezzo).toFixed(2).replace('.',',');
-                    
                     listaHtml += `
                     <li class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="text-truncate" style="flex: 1 1 200px; min-width: 0;">
@@ -1171,58 +1160,127 @@
 
             html += `<div class="row">`;
 
-            if(autonome.length > 0) {
-                html += `<div class="col-md-6 mb-3">
-                    <div class="p-3 bg-white border border-success rounded shadow-sm h-100">
-                        <h6 class="fw-bold text-success border-bottom pb-2">📦 Spedizioni Indipendenti</h6>
+            // VALUTAZIONE CASI DI SPEDIZIONE LOGISTICA
+            // CASO 4: Tutte le botteghe superano il minimo da sole
+            if (sopraMinimo.length === allBottegheCat.length) {
+                html += `<div class="col-12 mb-3">
+                    <div class="p-3 bg-white border border-success rounded shadow-sm">
+                        <h6 class="fw-bold text-success border-bottom pb-2">📦 Caso 4: Spedizioni Indipendenti Dirette (Ogni bottega riceve il proprio ordine)</h6>
                         <ul class="list-group list-group-flush mb-0">`;
-                autonome.forEach(a => {
-                    const nomeB = AppState.botteghe.find(b => b.id_bottega == a.id)?.nome_bottega || 'Sconosciuta';
-                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-3">
+                sopraMinimo.forEach(idB => {
+                    const nomeB = AppState.botteghe.find(b => b.id_bottega == idB)?.nome_bottega || 'Sconosciuta';
+                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-2">
                         <div class="d-flex justify-content-between align-items-center w-100">
-                            <span><strong class="text-dark">${nomeB}</strong><br><small class="text-muted">Raggiunge il minimo. Spedizione diretta.</small></span>
-                            <span class="fw-bold text-success fs-5">€ ${a.totale.toFixed(2).replace('.',',')}</span>
+                            <span><strong class="text-dark">${nomeB}</strong> <small class="text-success ms-2">(Supera il minimo da sola)</small></span>
+                            <span class="fw-bold text-success fs-5">€ ${spesaPerBottega[idB].toFixed(2).replace('.',',')}</span>
                         </div>
-                        ${generaListaProdottiModificabile(a.id)}
+                        ${generaListaProdottiModificabile(idB)}
                     </li>`;
                 });
                 html += `</ul></div></div>`;
             }
-
-            if(raggruppate.length > 0) {
-                html += `<div class="col-md-6 mb-3">
-                    <div class="p-3 bg-white border border-warning rounded shadow-sm h-100">
-                        <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Spedizioni Raggruppate ${!minimoSuperato ? '(In attesa)' : ''}</h6>
+            // CASO 1: Nessuna bottega supera il minimo da sola
+            else if (sopraMinimo.length === 0) {
+                html += `<div class="col-12 mb-3">
+                    <div class="p-3 bg-white border border-warning rounded shadow-sm">
+                        <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Caso 1: Spedizione Unica Raggruppata per la Categoria</h6>
+                        <p class="small text-muted mb-2">Nessuna bottega raggiunge il minimo autonomamente. La merce verrà consolidata in un unico ordine per AltraQualità.</p>
                         <ul class="list-group list-group-flush mb-3">`;
-                raggruppate.forEach(r => {
-                    const nomeB = AppState.botteghe.find(b => b.id_bottega == r.id)?.nome_bottega || 'Sconosciuta';
-                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-3">
+                sottoMinimo.forEach(idB => {
+                    const nomeB = AppState.botteghe.find(b => b.id_bottega == idB)?.nome_bottega || 'Sconosciuta';
+                    html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-2">
                         <div class="d-flex justify-content-between align-items-center w-100">
                             <span class="text-dark fw-bold">${nomeB}</span>
-                            <span class="text-muted fw-bold fs-6">€ ${r.totale.toFixed(2).replace('.',',')}</span>
+                            <span class="text-muted fw-bold">€ ${spesaPerBottega[idB].toFixed(2).replace('.',',')}</span>
                         </div>
-                        ${generaListaProdottiModificabile(r.id)}
+                        ${generaListaProdottiModificabile(idB)}
                     </li>`;
                 });
-                html += `<li class="list-group-item bg-transparent px-0 d-flex justify-content-between border-top mt-2 pt-3 bg-light rounded">
-                    <strong class="text-dark ms-2">Totale Raggruppamento</strong>
-                    <strong class="text-brand fs-5 me-2">€ ${totRaggruppate.toFixed(2).replace('.',',')}</strong>
-                </li></ul>`;
-
-                html += `<div class="p-3 bg-light border border-secondary-subtle rounded mt-3">
-                    <label class="fw-bold small mb-2 text-dark">Indirizzo di spedizione per questo gruppo:</label>
-                    <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="spedizione-cat-${idCat}">
-                        <option value="" disabled selected>Seleziona sede di destinazione...</option>`;
-                
+                html += `</ul>
+                <div class="p-3 bg-light border rounded">
+                    <label class="fw-bold small mb-2 text-dark">Scegli la sede di destinazione unica per l'ordine:</label>
+                    <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="destinazione-cat-${idCat}">
+                        <option value="" disabled selected>Seleziona bottega dove recapitare il collo unico...</option>`;
                 AppState.botteghe.forEach(b => {
-                    html += `<option value="${b.id_bottega}">Spedisci alla sede di: ${b.nome_bottega}</option>`;
+                    html += `<option value="${b.id_bottega}">Spedisci a: ${b.nome_bottega}</option>`;
                 });
-
                 html += `</select>
-                    <small class="text-muted d-block mt-2" style="font-size: 0.75rem; line-height: 1.2;">La merce viaggerà in un unico scatolone per ottimizzare la logistica. Le distinte cartacee all'interno saranno mantenute separate.</small>
-                </div>`;
-                
-                html += `</div></div>`;
+                </div></div></div>`;
+            }
+            // CASI MISTI (CASO 2 o CASO 3)
+            else {
+                // CASO 2: Le rimanenti sotto-minimo insieme superano il minimo
+                if (totSottoMinimo >= minOrdineInfo) {
+                    html += `<div class="col-md-6 mb-3">
+                        <div class="p-3 bg-white border border-success rounded shadow-sm h-100">
+                            <h6 class="fw-bold text-success border-bottom pb-2">📦 Caso 2A: Spedizione Autonoma Diretta</h6>
+                            <ul class="list-group list-group-flush mb-0">`;
+                    sopraMinimo.forEach(idB => {
+                        const nomeB = AppState.botteghe.find(b => b.id_bottega == idB)?.nome_bottega || 'Sconosciuta';
+                        html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-2">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span><strong class="text-dark">${nomeB}</strong> <small class="text-muted d-block">Spedizione autonoma</small></span>
+                                <span class="fw-bold text-success fs-5">€ ${spesaPerBottega[idB].toFixed(2).replace('.',',')}</span>
+                            </div>
+                            ${generaListaProdottiModificabile(idB)}
+                        </li>`;
+                    });
+                    html += `</ul></div></div>`;
+
+                    html += `<div class="col-md-6 mb-3">
+                        <div class="p-3 bg-white border border-warning rounded shadow-sm h-100">
+                            <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Caso 2B: Spedizione Raggruppata Rimanenti</h6>
+                            <p class="small text-muted mb-2">Le botteghe rimanenti insieme superano il minimo (€ ${totSottoMinimo.toFixed(2).replace('.',',')}).</p>
+                            <ul class="list-group list-group-flush mb-3">`;
+                    sottoMinimo.forEach(idB => {
+                        const nomeB = AppState.botteghe.find(b => b.id_bottega == idB)?.nome_bottega || 'Sconosciuta';
+                        html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-2">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span class="text-dark fw-bold">${nomeB}</span>
+                                <span class="text-muted fw-bold">€ ${spesaPerBottega[idB].toFixed(2).replace('.',',')}</span>
+                            </div>
+                            ${generaListaProdottiModificabile(idB)}
+                        </li>`;
+                    });
+                    html += `</ul>
+                    <div class="p-3 bg-light border rounded">
+                        <label class="fw-bold small mb-2 text-dark">Scegli destinazione per il gruppo rimanente:</label>
+                        <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="destinazione-cat-${idCat}">
+                            <option value="" disabled selected>Seleziona bottega di destinazione...</option>`;
+                    AppState.botteghe.forEach(b => {
+                        html += `<option value="${b.id_bottega}">Spedisci a: ${b.nome_bottega}</option>`;
+                    });
+                    html += `</select>
+                    </div></div></div>`;
+                }
+                // CASO 3: Le rimanenti sotto-minimo insieme NON superano il minimo
+                else {
+                    html += `<div class="col-12 mb-3">
+                        <div class="p-3 bg-white border border-warning rounded shadow-sm">
+                            <h6 class="fw-bold text-warning border-bottom pb-2" style="color: #d39e00 !important;">🤝 Caso 3: Spedizione Unificata Categoria</h6>
+                            <p class="small text-muted mb-2">Le botteghe rimanenti non raggiungono il minimo da sole (totale rimanente: € ${totSottoMinimo.toFixed(2).replace('.',',')}). L'ordine della categoria viene unificato per garantire l'evasione.</p>
+                            <ul class="list-group list-group-flush mb-3">`;
+                    allBottegheCat.forEach(idB => {
+                        const nomeB = AppState.botteghe.find(b => b.id_bottega == idB)?.nome_bottega || 'Sconosciuta';
+                        html += `<li class="list-group-item bg-transparent px-0 d-flex flex-column py-2">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span class="text-dark fw-bold">${nomeB}</span>
+                                <span class="text-muted fw-bold">€ ${spesaPerBottega[idB].toFixed(2).replace('.',',')}</span>
+                            </div>
+                            ${generaListaProdottiModificabile(idB)}
+                        </li>`;
+                    });
+                    html += `</ul>
+                    <div class="p-3 bg-light border rounded">
+                        <label class="fw-bold small mb-2 text-dark">Scegli la sede di destinazione per l'ordine unico unificato:</label>
+                        <select class="form-select form-select-sm border-secondary fw-bold text-brand" id="destinazione-cat-${idCat}">
+                            <option value="" disabled selected>Seleziona bottega di destinazione...</option>`;
+                    AppState.botteghe.forEach(b => {
+                        html += `<option value="${b.id_bottega}">Spedisci a: ${b.nome_bottega}</option>`;
+                    });
+                    html += `</select>
+                    </div></div></div>`;
+                }
             }
 
             html += `</div></div></div>`; 
@@ -1277,7 +1335,7 @@
         }
     }
 
-    /* === LOGICA INVIO ORDINI AL DATABASE (UNIFICAZIONE LOGISTICA RAGGRUPPATA PER ALTRAQUALITA') === */
+    /* === LOGICA DEFINITIVA INVIO ORDINI AL DATABASE IN BASE AI 4 CASI LOGISTICI === */
     async function inviaOrdineDefinitivo() {
         if(!confirm("Confermi di voler inviare l'ordine definitivo ad AltraQualità?")) return;
         
@@ -1289,24 +1347,26 @@
 
         const categorieNelCarrello = [...new Set(AppState.carrello.map(i => i.id_categoria))];
 
-        // 1. VERIFICA PRELIMINARE: controllo selezione destinazioni raggruppate
+        // 1. VERIFICA PRELIMINARE DESTINAZIONI RAGGRUPPATE
         for (const idCat of categorieNelCarrello) {
             const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || { nome_categoria: 'Sconosciuta', minimo_ordine: 0 };
             const minOrdineInfo = Number(infoCat.minimo_ordine) || 0;
             const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
 
-            const spesaPerBottega = {};
+            let spesaPerBottega = {};
             vociCat.forEach(v => {
                 spesaPerBottega[v.id_bottega] = (spesaPerBottega[v.id_bottega] || 0) + (v.quantita * v.prezzo);
             });
 
-            const raggruppate = Object.keys(spesaPerBottega).filter(idB => spesaPerBottega[idB] < minOrdineInfo);
+            const allBottegheCat = Object.keys(spesaPerBottega);
+            const sopraMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] >= minOrdineInfo && minOrdineInfo > 0);
 
-            if (raggruppate.length > 0) {
-                const selectEl = document.getElementById(`spedizione-cat-${idCat}`);
-                if (selectEl && !selectEl.value && raggruppate.length > 1) {
-                    alert(`Attenzione: Seleziona la sede di destinazione per la spedizione raggruppata della categoria "${infoCat.nome_categoria}" prima di inviare.`);
-                    if (btn) { btn.disabled = false; btn.innerHTML = "✅ Conferma e Invia Ordine"; }
+            // Se la spedizione non è 100% autonoma per ciascuna bottega, serve la selezione di destinazione
+            if (sopraMinimo.length < allBottegheCat.length) {
+                const selectEl = document.getElementById(`destinazione-cat-${idCat}`);
+                if (selectEl && !selectEl.value && allBottegheCat.length > 1) {
+                    alert(`Attenzione: Seleziona la sede di destinazione per la spedizione raggruppata della categoria "${infoCat.nome_categoria}" prima di procedere.`);
+                    if (btn) { btn.disabled = false; btn.innerText = "✅ Conferma e Invia Ordine"; }
                     return;
                 }
             }
@@ -1315,32 +1375,27 @@
         let errori = 0;
         let testateCreate = 0;
 
-        // 2. CREAZIONE ORDINI PER CATEGORIA (modulo per modulo)
+        // 2. ESECUZIONE INSERIMENTI IN BASE AI CASI LOGISTICI
         for (const idCat of categorieNelCarrello) {
             const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || { minimo_ordine: 0 };
             const minOrdineInfo = Number(infoCat.minimo_ordine) || 0;
             const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
 
-            const spesaPerBottega = {};
+            let spesaPerBottega = {};
             vociCat.forEach(v => {
                 spesaPerBottega[v.id_bottega] = (spesaPerBottega[v.id_bottega] || 0) + (v.quantita * v.prezzo);
             });
 
-            const autonome = [];
-            const raggruppate = [];
+            const allBottegheCat = Object.keys(spesaPerBottega);
+            const sopraMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] >= minOrdineInfo && minOrdineInfo > 0);
+            const sottoMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] < minOrdineInfo || minOrdineInfo === 0);
+            const totSottoMinimo = sottoMinimo.reduce((sum, idB) => sum + spesaPerBottega[idB], 0);
 
-            for (let idBottega in spesaPerBottega) {
-                if (spesaPerBottega[idBottega] >= minOrdineInfo) {
-                    autonome.push(idBottega);
-                } else {
-                    raggruppate.push(idBottega);
-                }
-            }
+            const selectEl = document.getElementById(`destinazione-cat-${idCat}`);
+            const destSelezionata = (selectEl && selectEl.value) ? parseInt(selectEl.value) : parseInt(allBottegheCat[0]);
 
-            // A) ORDINI AUTONOMI (Spedizioni dirette singole)
-            for (const idBottegaAutonoma of autonome) {
-                const itemsBottega = vociCat.filter(i => i.id_bottega == idBottegaAutonoma);
-                const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == idBottegaAutonoma);
+            const creaSingoloOrdineInDB = async (idBottegaDest, itemsGroup) => {
+                const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == idBottegaDest);
                 let budget = null;
                 if (bottegaInfo && bottegaInfo.budget && bottegaInfo.budget[idCat]) {
                     budget = parseFloat(bottegaInfo.budget[idCat]);
@@ -1348,100 +1403,87 @@
 
                 const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
                     id_cliente: AppState.user.id,
-                    id_bottega: parseInt(idBottegaAutonoma),
+                    id_bottega: parseInt(idBottegaDest),
                     id_categoria: parseInt(idCat),
                     budget_impostato: budget || null
                 }]).select().single();
 
                 if (errTestata) {
-                    console.error(`Errore Testata Autonoma per bottega ${idBottegaAutonoma}:`, errTestata.message);
+                    console.error(`Errore Inserimento Testata:`, errTestata.message);
                     errori++;
-                    continue;
+                    return false;
                 }
 
                 const idOrdineGenerato = testata.id_ordine;
 
-                const righeDettaglio = itemsBottega.map(item => ({
-                    id_ordine: idOrdineGenerato,
-                    codice_articolo: item.codice_articolo,
-                    quantita: item.quantita,
-                    prezzo_unitario_applicato: item.prezzo
-                }));
-
-                const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
-                if (errDettagli) {
-                    console.error(`Errore Dettagli Autonomi per bottega ${idBottegaAutonoma}:`, errDettagli.message);
-                    errori++;
-                } else {
-                    testateCreate++;
-                }
-            }
-
-            // B) ORDINE RAGGRUPPATO UNICO (Collo unico per AltraQualità verso la destinazione scelta)
-            if (raggruppate.length > 0) {
-                const selectEl = document.getElementById(`spedizione-cat-${idCat}`);
-                let idBottegaDestinazione = null;
-
-                if (selectEl && selectEl.value) {
-                    idBottegaDestinazione = parseInt(selectEl.value);
-                } else {
-                    idBottegaDestinazione = parseInt(raggruppate[0]);
-                }
-
-                const itemsRaggruppati = vociCat.filter(i => raggruppate.includes(String(i.id_bottega)));
-
-                const { data: testataRaggruppata, error: errTestataGroup } = await clientDB.from('ordini_testata').insert([{
-                    id_cliente: AppState.user.id,
-                    id_bottega: idBottegaDestinazione,
-                    id_categoria: parseInt(idCat),
-                    budget_impostato: null
-                }]).select().single();
-
-                if (errTestataGroup) {
-                    console.error(`Errore Testata Raggruppata Categoria ${idCat}:`, errTestataGroup.message);
-                    errori++;
-                    continue;
-                }
-
-                const idOrdineGroupGenerato = testataRaggruppata.id_ordine;
-
-                // Consolida le quantità per lo stesso codice articolo nell'unico scatolone
+                // Consolida quantità articoli uguali
                 const articoliMappati = {};
-                itemsRaggruppati.forEach(item => {
-                    if (!articoliMappati[item.codice_articolo]) {
-                        articoliMappati[item.codice_articolo] = {
+                itemsGroup.forEach(item => {
+                    const cod = item.codice_articolo.trim().toUpperCase();
+                    if (!articoliMappati[cod]) {
+                        articoliMappati[cod] = {
                             codice_articolo: item.codice_articolo,
                             quantita: 0,
                             prezzo_unitario_applicato: item.prezzo
                         };
                     }
-                    articoliMappati[item.codice_articolo].quantita += item.quantita;
+                    articoliMappati[cod].quantita += item.quantita;
                 });
 
-                const righeDettaglioGroup = Object.values(articoliMappati).map(a => ({
-                    id_ordine: idOrdineGroupGenerato,
+                const righeDettaglio = Object.values(articoliMappati).map(a => ({
+                    id_ordine: idOrdineGenerato,
                     codice_articolo: a.codice_articolo,
                     quantita: a.quantita,
                     prezzo_unitario_applicato: a.prezzo_unitario_applicato
                 }));
 
-                const { error: errDettagliGroup } = await clientDB.from('ordini_dettaglio').insert(righeDettaglioGroup);
-                if (errDettagliGroup) {
-                    console.error(`Errore Dettagli Raggruppati Categoria ${idCat}:`, errDettagliGroup.message);
+                const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
+                if (errDettagli) {
+                    console.error(`Errore Inserimento Dettagli:`, errDettagli.message);
                     errori++;
-                } else {
-                    testateCreate++;
+                    return false;
+                }
+
+                testateCreate++;
+                return true;
+            };
+
+            // CASO 4: Tutte le botteghe superano il minimo da sole -> Ordini autonomi distinti
+            if (sopraMinimo.length === allBottegheCat.length) {
+                for (const idB of allBottegheCat) {
+                    const itemsBottega = vociCat.filter(i => String(i.id_bottega) === String(idB));
+                    await creaSingoloOrdineInDB(idB, itemsBottega);
+                }
+            }
+            // CASO 1: Nessuna sopra il minimo -> 1 Ordine unificato per tutta la categoria
+            else if (sopraMinimo.length === 0) {
+                await creaSingoloOrdineInDB(destSelezionata, vociCat);
+            }
+            // CASI MISTI
+            else {
+                // CASO 2: Le rimanenti insieme superano il minimo -> Ordini autonomi per le grandi + 1 Ordine raggruppato per le rimanenti
+                if (totSottoMinimo >= minOrdineInfo) {
+                    for (const idB of sopraMinimo) {
+                        const itemsBottega = vociCat.filter(i => String(i.id_bottega) === String(idB));
+                        await creaSingoloOrdineInDB(idB, itemsBottega);
+                    }
+                    const itemsRimanenti = vociCat.filter(i => sottoMinimo.includes(String(i.id_bottega)));
+                    await creaSingoloOrdineInDB(destSelezionata, itemsRimanenti);
+                }
+                // CASO 3: Le rimanenti insieme NON superano il minimo -> 1 Ordine unico unificato per tutta la categoria
+                else {
+                    await creaSingoloOrdineInDB(destSelezionata, vociCat);
                 }
             }
         }
 
         if (errori > 0) {
-            alert(`Si è verificato un problema. ${testateCreate} ordini generati con successo, ma ${errori} hanno fallito. Controlla lo storico.`);
+            alert(`Si è verificato un problema: ${testateCreate} ordini generati con successo, ma ${errori} hanno fallito.`);
             if (btn) { btn.disabled = false; btn.innerText = "Riprova Invio Falliti"; }
             return;
         }
 
-        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini spedizione</b> sono stati registrati con successo in Supabase!<br>AltraQualità ha ricevuto i colli separati per destinazione logistica.`;
+        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini spedizione</b> sono stati salvati con successo in Supabase e inviati ad AltraQualità!`;
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
         AppState.carrello = [];
@@ -1513,7 +1555,7 @@
                 <div class="card-body">
                     <div class="row mb-3">
                         <div class="col-sm-6"><span class="text-muted small d-block">Sede di Destinazione Spedizione:</span><strong class="text-dark">${nomeBottega}</strong></div>
-                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo / Categoria Prodotto:</span><strong class="text-dark">${nomeCat}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo d'Ordine / Categoria:</span><strong class="text-dark">${nomeCat}</strong></div>
                     </div>
                     <div class="table-responsive bg-white rounded border">
                         <table class="table table-sm table-borderless mb-0">
@@ -1532,7 +1574,7 @@
                 html += `
                                 <tr class="border-bottom border-light">
                                     <td class="fw-semibold text-dark px-3 align-middle">${r.codice_articolo}</td>
-                                    <td class="text-center align-middle">${r.quantita}</td>
+                                    <td class="text-center align-middle fw-bold">${r.quantita}</td>
                                     <td class="text-end text-muted align-middle">€ ${Number(r.prezzo_unitario_applicato).toFixed(2).replace('.',',')}</td>
                                     <td class="text-end fw-bold text-dark px-3 align-middle">€ ${sub.toFixed(2).replace('.',',')}</td>
                                 </tr>`;
