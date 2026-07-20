@@ -1009,7 +1009,7 @@
             if (budgetSpecificoCategoria > 0) {
                 const spesaBottegaInCategoria = AppState.carrello
                     .filter(i => i.id_bottega == AppState.bottegaAttivaId && i.id_categoria == AppState.categoriaAttivaId)
-                    .reduce((sum, i) => sum + (i.quantita * i.prezzo), 0);
+                    .reduce((sum, item) => sum + (item.quantita * item.prezzo), 0);
                 
                 const residuo = budgetSpecificoCategoria - spesaBottegaInCategoria;
                 const infoCat = AppState.categorieCache.find(c => c.id_categoria == AppState.categoriaAttivaId);
@@ -1288,13 +1288,92 @@
         }
     }
 
+    // --- NUOVA LOGICA DI INVIO ORDINI AL DATABASE (DIVISI PER BOTTEGA E CATEGORIA) ---
     async function inviaOrdineDefinitivo() {
-        if(!confirm("Confermi di voler inviare l'ordine definitivo a tutti i produttori?")) return;
+        if(!confirm("Confermi di voler inviare l'ordine definitivo? Verranno generati ordini separati per ogni modulo e singola bottega.")) return;
         
-        document.getElementById('success-modal-msg').innerHTML = "Il tuo ordine è stato registrato ed inviato con successo ad <b>AltraQualità</b>!<br>Riceverai a breve un'email di riepilogo.";
+        const btn = document.getElementById('btn-conferma-ordine');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "Creazione ordini in database...";
+        }
+
+        // 1. Raggruppiamo il carrello per Categoria E per Bottega
+        const ordiniRaggruppati = {};
+        
+        AppState.carrello.forEach(item => {
+            const key = `${item.id_categoria}_${item.id_bottega}`;
+            if (!ordiniRaggruppati[key]) {
+                ordiniRaggruppati[key] = {
+                    id_categoria: item.id_categoria,
+                    id_bottega: item.id_bottega,
+                    items: []
+                };
+            }
+            ordiniRaggruppati[key].items.push(item);
+        });
+
+        let errori = 0;
+        let testateCreate = 0;
+
+        // 2. Iteriamo sui gruppi creati e facciamo gli inserimenti
+        for (const key in ordiniRaggruppati) {
+            const gruppo = ordiniRaggruppati[key];
+
+            // Recuperiamo il budget impostato per questa bottega e categoria (se esiste)
+            const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == gruppo.id_bottega);
+            let budget = null;
+            if (bottegaInfo && bottegaInfo.budget && bottegaInfo.budget[gruppo.id_categoria]) {
+                budget = parseFloat(bottegaInfo.budget[gruppo.id_categoria]);
+            }
+
+            // 3. Creiamo la Testata dell'ordine rispettando le colonne di Supabase
+            const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
+                id_cliente: AppState.user.id,
+                id_bottega: parseInt(gruppo.id_bottega),
+                id_categoria: parseInt(gruppo.id_categoria),
+                budget_impostato: budget || null
+            }]).select().single();
+
+            if (errTestata) {
+                console.error(`Errore testata ${key}:`, errTestata.message);
+                errori++;
+                continue; // Passiamo al gruppo successivo se fallisce
+            }
+
+            // Ricaviamo l'id_ordine appena generato da Supabase
+            const idOrdineGenerato = testata.id_ordine;
+
+            // 4. Prepariamo le righe di dettaglio
+            const righeDettaglio = gruppo.items.map(item => ({
+                id_ordine: idOrdineGenerato,
+                codice_articolo: item.codice_articolo,
+                quantita: item.quantita,
+                prezzo_unitario_applicato: item.prezzo
+            }));
+
+            // 5. Inseriamo i dettagli per questo specifico ordine
+            const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
+
+            if (errDettagli) {
+                console.error(`Errore dettagli ${key}:`, errDettagli.message);
+                errori++;
+            } else {
+                testateCreate++;
+            }
+        }
+
+        // 6. Verifica finale
+        if (errori > 0) {
+            alert(`Si è verificato qualche errore. ${testateCreate} ordini salvati, ma ${errori} hanno fallito. Controlla il database e riprova l'invio per i rimanenti.`);
+            if (btn) { btn.disabled = false; btn.innerHTML = "Riprova Invio Falliti"; }
+            return;
+        }
+
+        // 7. Tutto perfetto! Mostriamo il successo e svuotiamo il carrello
+        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini</b> (divisi per modulo e bottega) sono stati registrati con successo in Supabase!`;
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
-        // Svuotiamo il carrello in App e dal database (Bozza)
         AppState.carrello = [];
         await salvaCarrelloInBozza();
         
