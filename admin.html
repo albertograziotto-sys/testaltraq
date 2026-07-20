@@ -11,20 +11,53 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <style>
-        /* Piccole utility per la UI */
-        body { background-color: #f8f9fa; }
+        :root {
+            --altraq-brand: #f56f11;
+            --altraq-hover: #d45e0d;
+        }
+
+        body { 
+            background-color: #f8f9fa; 
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
         .d-none { display: none !important; }
+
+        /* Classi utility Brand AltraQualità */
+        .brand-bg-color {
+            background-color: var(--altraq-brand) !important;
+        }
+
+        .text-brand {
+            color: var(--altraq-brand) !important;
+        }
+
+        .btn-brand {
+            background-color: var(--altraq-brand);
+            color: white;
+            border: none;
+        }
+
+        .btn-brand:hover {
+            background-color: var(--altraq-hover);
+            color: white;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--altraq-brand);
+            box-shadow: 0 0 0 0.25rem rgba(245, 111, 17, 0.25);
+        }
     </style>
 </head>
 <body>
 
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <!-- Navbar Brand -->
+    <nav class="navbar navbar-expand-lg navbar-dark brand-bg-color mb-4 shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">📦 AltraQualità Admin</a>
-            <div class="d-flex" id="user-menu" class="d-none">
-                <span class="navbar-text me-3" id="admin-email"></span>
-                <button class="btn btn-outline-light btn-sm" id="btn-logout">Logout</button>
+            <a class="navbar-brand fw-bold" href="#">📦 AltraQualità | Gestione Ordini Staff</a>
+            <div class="d-flex align-items-center d-none" id="user-menu">
+                <span class="navbar-text text-white me-3 fw-semibold" id="admin-email"></span>
+                <button class="btn btn-outline-light btn-sm fw-bold" id="btn-logout">Logout</button>
             </div>
         </div>
     </nav>
@@ -34,19 +67,19 @@
         <!-- SEZIONE 1: LOGIN -->
         <div id="login-section" class="row justify-content-center">
             <div class="col-md-5">
-                <div class="card shadow-sm mt-5">
-                    <div class="card-body">
-                        <h4 class="card-title text-center mb-4">Accesso Staff</h4>
+                <div class="card shadow-sm mt-5 border-0">
+                    <div class="card-body p-4">
+                        <h4 class="card-title text-center mb-4 fw-bold text-brand">Accesso Staff AltraQualità</h4>
                         <form id="login-form">
                             <div class="mb-3">
-                                <label class="form-label">Email</label>
-                                <input type="email" id="email" class="form-control" required>
+                                <label class="form-label fw-semibold">Email Staff</label>
+                                <input type="email" id="email" class="form-control" placeholder="nome@altraqualita.it" required>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Password</label>
+                                <label class="form-label fw-semibold">Password</label>
                                 <input type="password" id="password" class="form-control" required>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Accedi</button>
+                            <button type="submit" class="btn btn-brand w-100 py-2 fw-bold">Accedi alla Dashboard</button>
                         </form>
                         <div id="login-error" class="alert alert-danger mt-3 d-none"></div>
                     </div>
@@ -58,46 +91,53 @@
         <div id="dashboard-section" class="d-none">
             
             <!-- Header Dashboard & Filtri -->
-            <div class="row mb-3 align-items-end">
-                <div class="col-md-4">
-                    <h2 class="mb-0">Ordini in Ingresso</h2>
-                    <p class="text-muted">Ordini da processare e inviare ai fornitori</p>
+            <div class="row mb-4 align-items-end g-3">
+                <div class="col-md-3">
+                    <h2 class="mb-0 fw-bold">Ordini in Ingresso</h2>
+                    <p class="text-muted small mb-0">Preordini B2B da elaborare</p>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Filtra per Categoria (Modulo)</label>
+                    <label class="form-label small fw-bold">Cerca Cliente o Bottega</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="search-cliente" class="form-control" placeholder="Ragione sociale o bottega...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Filtra per Modulo d'Ordine</label>
                     <select id="filter-categoria" class="form-select">
-                        <option value="">Tutte le categorie</option>
-                        <!-- Popolato dinamicamente da Supabase -->
+                        <option value="">Tutti i moduli</option>
                     </select>
                 </div>
-                <div class="col-md-5 text-end">
-                    <button id="btn-export-csv" class="btn btn-success me-2">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Esporta CSV
-                    </button>
-                    <button id="btn-mark-downloaded" class="btn btn-warning">
-                        <i class="bi bi-check2-all"></i> Segna come Presi in Carico
-                    </button>
+                <div class="col-md-3 text-end">
+                    <div class="d-grid gap-2 d-md-block">
+                        <button id="btn-export-csv" class="btn btn-success me-md-1">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Esporta CSV
+                        </button>
+                        <button id="btn-mark-downloaded" class="btn btn-brand">
+                            <i class="bi bi-check2-all"></i> Presi in Carico
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- Tabella Ordini -->
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0">
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped mb-0">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-dark">
                                 <tr>
-                                    <th><input type="checkbox" id="select-all"></th>
-                                    <th>Data</th>
+                                    <th style="width: 40px;"><input type="checkbox" id="select-all" class="form-check-input"></th>
+                                    <th>Data Ordine</th>
                                     <th>Cliente</th>
-                                    <th>Bottega</th>
-                                    <th>Categoria</th>
-                                    <th>Articoli Tot.</th>
+                                    <th>Bottega Fisico/Destinazione</th>
+                                    <th>Modulo d'Ordine</th>
                                     <th>Stato</th>
                                 </tr>
                             </thead>
                             <tbody id="orders-table-body">
-                                <!-- Le righe verranno generate dinamicamente con JS -->
+                                <!-- Popolato dinamicamente da admin.js -->
                             </tbody>
                         </table>
                     </div>
