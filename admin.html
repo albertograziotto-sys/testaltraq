@@ -103,18 +103,21 @@
                         <input type="text" id="search-cliente" class="form-control" placeholder="Ragione sociale o bottega...">
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">Filtra per Modulo d'Ordine</label>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Filtra Modulo</label>
                     <select id="filter-categoria" class="form-select">
                         <option value="">Tutti i moduli</option>
                     </select>
                 </div>
-                <div class="col-md-3 text-end">
-                    <div class="d-grid gap-2 d-md-block">
-                        <button id="btn-export-csv" class="btn btn-success me-md-1">
-                            <i class="bi bi-file-earmark-spreadsheet"></i> Esporta CSV
+                <div class="col-md-4 text-end">
+                    <div class="btn-group w-100" role="group">
+                        <button id="btn-export-summary" class="btn btn-outline-dark btn-sm fw-bold" title="Esporta totale pezzi per codice articolo (per il fornitore)">
+                            <i class="bi bi-calculator"></i> Totali Fornitore
                         </button>
-                        <button id="btn-mark-downloaded" class="btn btn-brand">
+                        <button id="btn-export-csv" class="btn btn-success btn-sm fw-bold" title="Esporta il dettaglio ordine per ogni singola bottega">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Dettaglio Botteghe
+                        </button>
+                        <button id="btn-mark-downloaded" class="btn btn-brand btn-sm fw-bold" title="Segna come presi in carico su Supabase">
                             <i class="bi bi-check2-all"></i> Presi in Carico
                         </button>
                     </div>
@@ -131,7 +134,7 @@
                                     <th style="width: 40px;"><input type="checkbox" id="select-all" class="form-check-input"></th>
                                     <th>Data Ordine</th>
                                     <th>Cliente</th>
-                                    <th>Bottega Fisico/Destinazione</th>
+                                    <th>Bottega / Destinazione</th>
                                     <th>Modulo d'Ordine</th>
                                     <th>Stato</th>
                                 </tr>
