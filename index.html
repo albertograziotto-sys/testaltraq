@@ -1160,7 +1160,6 @@
 
             html += `<div class="row">`;
 
-            // VALUTAZIONE CASI DI SPEDIZIONE LOGISTICA
             // CASO 4: Tutte le botteghe superano il minimo da sole
             if (sopraMinimo.length === allBottegheCat.length) {
                 html += `<div class="col-12 mb-3">
@@ -1361,7 +1360,6 @@
             const allBottegheCat = Object.keys(spesaPerBottega);
             const sopraMinimo = allBottegheCat.filter(idB => spesaPerBottega[idB] >= minOrdineInfo && minOrdineInfo > 0);
 
-            // Se la spedizione non è 100% autonoma per ciascuna bottega, serve la selezione di destinazione
             if (sopraMinimo.length < allBottegheCat.length) {
                 const selectEl = document.getElementById(`destinazione-cat-${idCat}`);
                 if (selectEl && !selectEl.value && allBottegheCat.length > 1) {
@@ -1394,6 +1392,7 @@
             const selectEl = document.getElementById(`destinazione-cat-${idCat}`);
             const destSelezionata = (selectEl && selectEl.value) ? parseInt(selectEl.value) : parseInt(allBottegheCat[0]);
 
+            // Funzione interna per salvare testata + dettagli preservando l'id_bottega originale di ciascuna riga
             const creaSingoloOrdineInDB = async (idBottegaDest, itemsGroup) => {
                 const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == idBottegaDest);
                 let budget = null;
@@ -1401,6 +1400,7 @@
                     budget = parseFloat(bottegaInfo.budget[idCat]);
                 }
 
+                // Salva la Testata dell'ordine unica per la spedizione
                 const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
                     id_cliente: AppState.user.id,
                     id_bottega: parseInt(idBottegaDest),
@@ -1416,25 +1416,13 @@
 
                 const idOrdineGenerato = testata.id_ordine;
 
-                // Consolida quantità articoli uguali
-                const articoliMappati = {};
-                itemsGroup.forEach(item => {
-                    const cod = item.codice_articolo.trim().toUpperCase();
-                    if (!articoliMappati[cod]) {
-                        articoliMappati[cod] = {
-                            codice_articolo: item.codice_articolo,
-                            quantita: 0,
-                            prezzo_unitario_applicato: item.prezzo
-                        };
-                    }
-                    articoliMappati[cod].quantita += item.quantita;
-                });
-
-                const righeDettaglio = Object.values(articoliMappati).map(a => ({
+                // PRESERVA L'ID_BOTTEGA ORIGINALE: ogni riga mantiene la propria bottega richiedente!
+                const righeDettaglio = itemsGroup.map(item => ({
                     id_ordine: idOrdineGenerato,
-                    codice_articolo: a.codice_articolo,
-                    quantita: a.quantita,
-                    prezzo_unitario_applicato: a.prezzo_unitario_applicato
+                    id_bottega: parseInt(item.id_bottega),
+                    codice_articolo: item.codice_articolo,
+                    quantita: item.quantita,
+                    prezzo_unitario_applicato: item.prezzo
                 }));
 
                 const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
@@ -1483,7 +1471,7 @@
             return;
         }
 
-        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini spedizione</b> sono stati salvati con successo in Supabase e inviati ad AltraQualità!`;
+        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini spedizione</b> sono stati salvati con successo in Supabase!<br>AltraQualità ha ricevuto i colli unificati, mentre la distinta interna di smistamento per le botteghe è stata preservata nello storico.`;
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
         AppState.carrello = [];
@@ -1493,7 +1481,7 @@
         navigaA('orders-section'); 
     }
 
-    /* === STORICO ORDINI REALE DA SUPABASE === */
+    /* === STORICO ORDINI CON RIEPILOGO SMISTAMENTO PER BOTTEGA === */
     async function caricaStoricoOrdini() {
         const container = document.getElementById('orders-list-container');
         container.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-brand"></div><p class="mt-2 text-muted fw-bold">Caricamento ordini dal database...</p></div>';
@@ -1529,8 +1517,8 @@
 
         let html = '';
         testate.forEach(t => {
-            const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == t.id_bottega);
-            const nomeBottega = bottegaInfo ? bottegaInfo.nome_bottega : 'Bottega ID: ' + t.id_bottega;
+            const bottegaDest = AppState.botteghe.find(b => b.id_bottega == t.id_bottega);
+            const nomeBottegaDest = bottegaDest ? bottegaDest.nome_bottega : 'Bottega ID: ' + t.id_bottega;
             
             const catInfo = AppState.categorieCache.find(c => c.id_categoria == t.id_categoria);
             const nomeCat = catInfo ? catInfo.nome_categoria : 'Categoria ID: ' + t.id_categoria;
@@ -1554,15 +1542,16 @@
                 </div>
                 <div class="card-body">
                     <div class="row mb-3">
-                        <div class="col-sm-6"><span class="text-muted small d-block">Sede di Destinazione Spedizione:</span><strong class="text-dark">${nomeBottega}</strong></div>
-                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo d'Ordine / Categoria:</span><strong class="text-dark">${nomeCat}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Destinazione Consegna Collo:</span><strong class="text-dark fs-6">🏢 ${nomeBottegaDest}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo d'Ordine / Categoria:</span><strong class="text-dark fs-6">📁 ${nomeCat}</strong></div>
                     </div>
                     <div class="table-responsive bg-white rounded border">
                         <table class="table table-sm table-borderless mb-0">
                             <thead class="border-bottom bg-light">
                                 <tr class="text-muted small">
-                                    <th class="py-2 px-3">Codice Articolo</th>
-                                    <th class="text-center py-2">Q.tà Totale</th>
+                                    <th class="py-2 px-3">Bottega Destinataria</th>
+                                    <th class="py-2">Codice Articolo</th>
+                                    <th class="text-center py-2">Q.tà</th>
                                     <th class="text-end py-2">Prezzo Netto</th>
                                     <th class="text-end py-2 px-3">Subtotale</th>
                                 </tr>
@@ -1571,9 +1560,13 @@
             
             righeOrdine.forEach(r => {
                 const sub = r.quantita * r.prezzo_unitario_applicato;
+                const bOrig = AppState.botteghe.find(b => b.id_bottega == r.id_bottega);
+                const nomeBOrig = bOrig ? bOrig.nome_bottega : (r.id_bottega ? 'Bottega ID ' + r.id_bottega : 'Generale');
+
                 html += `
                                 <tr class="border-bottom border-light">
-                                    <td class="fw-semibold text-dark px-3 align-middle">${r.codice_articolo}</td>
+                                    <td class="px-3 align-middle"><span class="badge bg-light text-dark border">${nomeBOrig}</span></td>
+                                    <td class="fw-semibold text-dark align-middle">${r.codice_articolo}</td>
                                     <td class="text-center align-middle fw-bold">${r.quantita}</td>
                                     <td class="text-end text-muted align-middle">€ ${Number(r.prezzo_unitario_applicato).toFixed(2).replace('.',',')}</td>
                                     <td class="text-end fw-bold text-dark px-3 align-middle">€ ${sub.toFixed(2).replace('.',',')}</td>
