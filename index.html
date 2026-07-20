@@ -322,7 +322,6 @@
             const { data: clienteData } = await clientDB.from('clienti').select('*').eq('id', session.user.id).single();
             if (clienteData) {
                 AppState.user = clienteData;
-                // Carichiamo la bozza cloud se esiste
                 if(clienteData.carrello_bozza) {
                     AppState.carrello = clienteData.carrello_bozza;
                 }
@@ -382,11 +381,9 @@
     /* === GESTIONE FALLBACK IMMAGINI AUTOMATICA === */
     function gestisciErroreFoto(img, codice) {
         if (!img.dataset.tentativo) {
-            // Primo errore: proviamo ad aggiungere " (1)" al codice articolo
             img.dataset.tentativo = "1";
             img.src = `${SUPABASE_URL}/storage/v1/object/public/foto/${codice} (1).webp`;
         } else {
-            // Secondo errore: carichiamo un SVG locale leggero, indipendente dalla rete
             img.onerror = null;
             img.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%23f8f9fa"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="8" fill="%23adb5bd">Foto non disp.</text></svg>`;
         }
@@ -457,7 +454,6 @@
       if (dbError || !clienteData) { alert("Anagrafica non trovata."); await clientDB.auth.signOut(); btn.innerText = "Accedi al Portale"; btn.disabled = false; return; }
 
       AppState.user = clienteData; 
-      // Ripristiniamo la bozza cloud dal database
       if(clienteData.carrello_bozza) {
           AppState.carrello = clienteData.carrello_bozza;
       } else {
@@ -583,7 +579,6 @@
             if(AppState.bottegaAttivaId == idBottega) AppState.bottegaAttivaId = null;
             AppState.carrello = AppState.carrello.filter(i => i.id_bottega != idBottega);
             
-            // Salviamo il carrello sfoltito in cloud
             await salvaCarrelloInBozza();
             
             alert("Bottega eliminata con successo!");
@@ -732,7 +727,7 @@
         aggiornaBarraStickyCarrello();
     }
 
-    // LIVELLO 3. PRODOTTI DELLA CATEGORIA (GRIGLIA FOTO DIRETTA - BYPASS PRODUTTORI)
+    // LIVELLO 3. PRODOTTI DELLA CATEGORIA (GRIGLIA FOTO DIRETTA)
     async function apriCategoria(idCategoria, nomeCategoria, minimoOrdine, idCampagna, nomeCampagna) {
         if(!AppState.bottegaAttivaId) return alert("Seleziona una bottega dal menu in alto per iniziare!");
         AppState.categoriaAttivaId = idCategoria;
@@ -740,7 +735,6 @@
         const app = document.getElementById('app-container');
         app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div><p class="text-muted mt-2">Caricamento articoli...</p>';
 
-        // Recupero tutti i produttori legati a questa categoria per poterne mappare l'ID al Nome
         const { data: produttori, error: errP } = await clientDB.from('produttori').select('*').eq('id_categoria', idCategoria).order('nome_produttore');
         if (errP) { app.innerHTML = `<p class="text-danger fw-bold">Errore caricamento produttori: ${errP.message}</p>`; return; }
         
@@ -753,7 +747,6 @@
 
         let prodotti = [];
         if (prodIds.length > 0) {
-            // Estrazione di tutti i prodotti dei produttori appartenenti a questa categoria
             const { data: dataProdotti, error: errProd } = await clientDB.from('prodotti').select('*').in('id_produttore', prodIds).order('nome');
             if (errProd) { app.innerHTML = `<p class="text-danger fw-bold">Errore caricamento prodotti: ${errProd.message}</p>`; return; }
             prodotti = dataProdotti || [];
@@ -983,9 +976,7 @@
             }
         }
         
-        // Ogni volta che modifichiamo il carrello aggiorniamo la bozza sul server
         salvaCarrelloInBozza();
-        
         aggiornaBarraStickyCarrello();
     }
 
@@ -1038,7 +1029,7 @@
             }
             salvaCarrelloInBozza();
             aggiornaBarraStickyCarrello();
-            mostraRiepilogoCarrello(); // Ricarica la vista istantaneamente
+            mostraRiepilogoCarrello();
         }
     }
 
@@ -1048,7 +1039,7 @@
             AppState.carrello.splice(index, 1);
             salvaCarrelloInBozza();
             aggiornaBarraStickyCarrello();
-            mostraRiepilogoCarrello(); // Ricarica la vista istantaneamente
+            mostraRiepilogoCarrello();
         }
     }
 
@@ -1286,9 +1277,9 @@
         }
     }
 
-    // --- NUOVA LOGICA DI INVIO ORDINI AL DATABASE ---
+    /* === LOGICA INVIO ORDINI AL DATABASE (UNIFICAZIONE LOGISTICA RAGGRUPPATA PER ALTRAQUALITA') === */
     async function inviaOrdineDefinitivo() {
-        if(!confirm("Confermi di voler inviare l'ordine definitivo? Verranno generati ordini separati per ogni modulo e singola bottega.")) return;
+        if(!confirm("Confermi di voler inviare l'ordine definitivo ad AltraQualità?")) return;
         
         const btn = document.getElementById('btn-conferma-ordine');
         if (btn) {
@@ -1296,76 +1287,161 @@
             btn.innerText = "Salvataggio ordini nel database...";
         }
 
-        // Raggruppiamo il carrello per Categoria E per Bottega
-        const ordiniRaggruppati = {};
-        AppState.carrello.forEach(item => {
-            const key = `${item.id_categoria}_${item.id_bottega}`;
-            if (!ordiniRaggruppati[key]) {
-                ordiniRaggruppati[key] = {
-                    id_categoria: item.id_categoria,
-                    id_bottega: item.id_bottega,
-                    items: []
-                };
+        const categorieNelCarrello = [...new Set(AppState.carrello.map(i => i.id_categoria))];
+
+        // 1. VERIFICA PRELIMINARE: controllo selezione destinazioni raggruppate
+        for (const idCat of categorieNelCarrello) {
+            const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || { nome_categoria: 'Sconosciuta', minimo_ordine: 0 };
+            const minOrdineInfo = Number(infoCat.minimo_ordine) || 0;
+            const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
+
+            const spesaPerBottega = {};
+            vociCat.forEach(v => {
+                spesaPerBottega[v.id_bottega] = (spesaPerBottega[v.id_bottega] || 0) + (v.quantita * v.prezzo);
+            });
+
+            const raggruppate = Object.keys(spesaPerBottega).filter(idB => spesaPerBottega[idB] < minOrdineInfo);
+
+            if (raggruppate.length > 0) {
+                const selectEl = document.getElementById(`spedizione-cat-${idCat}`);
+                if (selectEl && !selectEl.value && raggruppate.length > 1) {
+                    alert(`Attenzione: Seleziona la sede di destinazione per la spedizione raggruppata della categoria "${infoCat.nome_categoria}" prima di inviare.`);
+                    if (btn) { btn.disabled = false; btn.innerHTML = "✅ Conferma e Invia Ordine"; }
+                    return;
+                }
             }
-            ordiniRaggruppati[key].items.push(item);
-        });
+        }
 
         let errori = 0;
         let testateCreate = 0;
 
-        for (const key in ordiniRaggruppati) {
-            const gruppo = ordiniRaggruppati[key];
+        // 2. CREAZIONE ORDINI PER CATEGORIA (modulo per modulo)
+        for (const idCat of categorieNelCarrello) {
+            const infoCat = AppState.categorieCache.find(c => c.id_categoria == idCat) || { minimo_ordine: 0 };
+            const minOrdineInfo = Number(infoCat.minimo_ordine) || 0;
+            const vociCat = AppState.carrello.filter(i => i.id_categoria == idCat);
 
-            const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == gruppo.id_bottega);
-            let budget = null;
-            if (bottegaInfo && bottegaInfo.budget && bottegaInfo.budget[gruppo.id_categoria]) {
-                budget = parseFloat(bottegaInfo.budget[gruppo.id_categoria]);
+            const spesaPerBottega = {};
+            vociCat.forEach(v => {
+                spesaPerBottega[v.id_bottega] = (spesaPerBottega[v.id_bottega] || 0) + (v.quantita * v.prezzo);
+            });
+
+            const autonome = [];
+            const raggruppate = [];
+
+            for (let idBottega in spesaPerBottega) {
+                if (spesaPerBottega[idBottega] >= minOrdineInfo) {
+                    autonome.push(idBottega);
+                } else {
+                    raggruppate.push(idBottega);
+                }
             }
 
-            // CREAZIONE TESTATA
-            const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
-                id_cliente: AppState.user.id,
-                id_bottega: gruppo.id_bottega,
-                id_categoria: gruppo.id_categoria,
-                budget_impostato: budget || null
-            }]).select().single();
+            // A) ORDINI AUTONOMI (Spedizioni dirette singole)
+            for (const idBottegaAutonoma of autonome) {
+                const itemsBottega = vociCat.filter(i => i.id_bottega == idBottegaAutonoma);
+                const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == idBottegaAutonoma);
+                let budget = null;
+                if (bottegaInfo && bottegaInfo.budget && bottegaInfo.budget[idCat]) {
+                    budget = parseFloat(bottegaInfo.budget[idCat]);
+                }
 
-            if (errTestata) {
-                console.error(`Errore Supabase nella Testata:`, errTestata.message);
-                alert("ERRORE DATABASE: " + errTestata.message);
-                errori++;
-                continue; 
+                const { data: testata, error: errTestata } = await clientDB.from('ordini_testata').insert([{
+                    id_cliente: AppState.user.id,
+                    id_bottega: parseInt(idBottegaAutonoma),
+                    id_categoria: parseInt(idCat),
+                    budget_impostato: budget || null
+                }]).select().single();
+
+                if (errTestata) {
+                    console.error(`Errore Testata Autonoma per bottega ${idBottegaAutonoma}:`, errTestata.message);
+                    errori++;
+                    continue;
+                }
+
+                const idOrdineGenerato = testata.id_ordine;
+
+                const righeDettaglio = itemsBottega.map(item => ({
+                    id_ordine: idOrdineGenerato,
+                    codice_articolo: item.codice_articolo,
+                    quantita: item.quantita,
+                    prezzo_unitario_applicato: item.prezzo
+                }));
+
+                const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
+                if (errDettagli) {
+                    console.error(`Errore Dettagli Autonomi per bottega ${idBottegaAutonoma}:`, errDettagli.message);
+                    errori++;
+                } else {
+                    testateCreate++;
+                }
             }
 
-            const idOrdineGenerato = testata.id_ordine;
+            // B) ORDINE RAGGRUPPATO UNICO (Collo unico per AltraQualità verso la destinazione scelta)
+            if (raggruppate.length > 0) {
+                const selectEl = document.getElementById(`spedizione-cat-${idCat}`);
+                let idBottegaDestinazione = null;
 
-            // PREPARAZIONE DETTAGLI
-            const righeDettaglio = gruppo.items.map(item => ({
-                id_ordine: idOrdineGenerato,
-                codice_articolo: item.codice_articolo,
-                quantita: item.quantita,
-                prezzo_unitario_applicato: item.prezzo
-            }));
+                if (selectEl && selectEl.value) {
+                    idBottegaDestinazione = parseInt(selectEl.value);
+                } else {
+                    idBottegaDestinazione = parseInt(raggruppate[0]);
+                }
 
-            // INSERIMENTO DETTAGLI
-            const { error: errDettagli } = await clientDB.from('ordini_dettaglio').insert(righeDettaglio);
+                const itemsRaggruppati = vociCat.filter(i => raggruppate.includes(String(i.id_bottega)));
 
-            if (errDettagli) {
-                console.error(`Errore Supabase nei Dettagli:`, errDettagli.message);
-                alert("ERRORE DETTAGLI: " + errDettagli.message);
-                errori++;
-            } else {
-                testateCreate++;
+                const { data: testataRaggruppata, error: errTestataGroup } = await clientDB.from('ordini_testata').insert([{
+                    id_cliente: AppState.user.id,
+                    id_bottega: idBottegaDestinazione,
+                    id_categoria: parseInt(idCat),
+                    budget_impostato: null
+                }]).select().single();
+
+                if (errTestataGroup) {
+                    console.error(`Errore Testata Raggruppata Categoria ${idCat}:`, errTestataGroup.message);
+                    errori++;
+                    continue;
+                }
+
+                const idOrdineGroupGenerato = testataRaggruppata.id_ordine;
+
+                // Consolida le quantità per lo stesso codice articolo nell'unico scatolone
+                const articoliMappati = {};
+                itemsRaggruppati.forEach(item => {
+                    if (!articoliMappati[item.codice_articolo]) {
+                        articoliMappati[item.codice_articolo] = {
+                            codice_articolo: item.codice_articolo,
+                            quantita: 0,
+                            prezzo_unitario_applicato: item.prezzo
+                        };
+                    }
+                    articoliMappati[item.codice_articolo].quantita += item.quantita;
+                });
+
+                const righeDettaglioGroup = Object.values(articoliMappati).map(a => ({
+                    id_ordine: idOrdineGroupGenerato,
+                    codice_articolo: a.codice_articolo,
+                    quantita: a.quantita,
+                    prezzo_unitario_applicato: a.prezzo_unitario_applicato
+                }));
+
+                const { error: errDettagliGroup } = await clientDB.from('ordini_dettaglio').insert(righeDettaglioGroup);
+                if (errDettagliGroup) {
+                    console.error(`Errore Dettagli Raggruppati Categoria ${idCat}:`, errDettagliGroup.message);
+                    errori++;
+                } else {
+                    testateCreate++;
+                }
             }
         }
 
         if (errori > 0) {
-            if (btn) { btn.disabled = false; btn.innerHTML = "Riprova Invio Falliti"; }
+            alert(`Si è verificato un problema. ${testateCreate} ordini generati con successo, ma ${errori} hanno fallito. Controlla lo storico.`);
+            if (btn) { btn.disabled = false; btn.innerText = "Riprova Invio Falliti"; }
             return;
         }
 
-        // Se arriva qui, l'inserimento è stato perfetto
-        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini</b> (divisi per modulo e bottega) sono stati registrati con successo in Supabase!`;
+        document.getElementById('success-modal-msg').innerHTML = `I tuoi <b>${testateCreate} ordini spedizione</b> sono stati registrati con successo in Supabase!<br>AltraQualità ha ricevuto i colli separati per destinazione logistica.`;
         new bootstrap.Modal(document.getElementById('successModal')).show();
         
         AppState.carrello = [];
@@ -1375,12 +1451,11 @@
         navigaA('orders-section'); 
     }
 
-    // --- NUOVA LOGICA DI LETTURA STORICO ORDINI ---
+    /* === STORICO ORDINI REALE DA SUPABASE === */
     async function caricaStoricoOrdini() {
         const container = document.getElementById('orders-list-container');
         container.innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-brand"></div><p class="mt-2 text-muted fw-bold">Caricamento ordini dal database...</p></div>';
 
-        // 1. Peschiamo tutte le testate di questo cliente
         const { data: testate, error: errT } = await clientDB.from('ordini_testata')
             .select('*')
             .eq('id_cliente', AppState.user.id)
@@ -1400,7 +1475,6 @@
             return;
         }
 
-        // 2. Peschiamo i dettagli associati a queste testate
         const orderIds = testate.map(t => t.id_ordine);
         const { data: dettagli, error: errD } = await clientDB.from('ordini_dettaglio')
             .select('*')
@@ -1411,7 +1485,6 @@
             return;
         }
 
-        // 3. Disegniamo le ricevute per ogni ordine
         let html = '';
         testate.forEach(t => {
             const bottegaInfo = AppState.botteghe.find(b => b.id_bottega == t.id_bottega);
@@ -1429,25 +1502,25 @@
             <div class="card shadow-sm border-0 mb-4 bg-light border-start border-4 border-brand">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap">
                     <div>
-                        <h5 class="fw-bold text-dark m-0">Ordine #${t.id_ordine}</h5>
+                        <h5 class="fw-bold text-dark m-0">Spedizione / Ordine #${t.id_ordine}</h5>
                         <small class="text-muted">${dataFormattata}</small>
                     </div>
                     <div class="text-end mt-2 mt-md-0">
-                        <span class="badge bg-brand fs-6 mb-1">Totale: € ${totaleCalcolato.toFixed(2).replace('.',',')}</span><br>
-                        ${t.flag_scaricato ? '<span class="badge bg-success small">Ricevuto in Sede</span>' : '<span class="badge bg-secondary small">Inviato al Sistema</span>'}
+                        <span class="badge bg-brand fs-6 mb-1">Totale Collo: € ${totaleCalcolato.toFixed(2).replace('.',',')}</span><br>
+                        ${t.flag_scaricato ? '<span class="badge bg-success small">Preso in carico da AltraQualità</span>' : '<span class="badge bg-secondary small">Inviato al Sistema</span>'}
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="row mb-3">
-                        <div class="col-sm-6"><span class="text-muted small d-block">Bottega Destinazione:</span><strong class="text-dark">${nomeBottega}</strong></div>
-                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo/Categoria:</span><strong class="text-dark">${nomeCat}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Sede di Destinazione Spedizione:</span><strong class="text-dark">${nomeBottega}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted small d-block">Modulo / Categoria Prodotto:</span><strong class="text-dark">${nomeCat}</strong></div>
                     </div>
                     <div class="table-responsive bg-white rounded border">
                         <table class="table table-sm table-borderless mb-0">
                             <thead class="border-bottom bg-light">
                                 <tr class="text-muted small">
                                     <th class="py-2 px-3">Codice Articolo</th>
-                                    <th class="text-center py-2">Q.tà</th>
+                                    <th class="text-center py-2">Q.tà Totale</th>
                                     <th class="text-end py-2">Prezzo Netto</th>
                                     <th class="text-end py-2 px-3">Subtotale</th>
                                 </tr>
