@@ -1,7 +1,9 @@
 // 1. Configurazione Supabase
 const SUPABASE_URL = 'https://tmaxqbosibkxrghgwfzi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ERRORE CORRETTO: Chiamiamo la variabile supabaseClient invece di supabase
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 2. Riferimenti alla UI
 const loginSection = document.getElementById('login-section');
@@ -16,7 +18,7 @@ const filterCategoria = document.getElementById('filter-categoria');
 let ordiniCorrenti = [];
 
 // 3. Gestore dello Stato di Autenticazione
-supabase.auth.onAuthStateChange((event, session) => {
+supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session) {
         // Mostra Dashboard
         loginSection.classList.add('d-none');
@@ -39,7 +41,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
     if (error) {
         loginError.textContent = "Errore di accesso: " + error.message;
@@ -51,7 +53,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
 });
 
 // 5. Inizializzazione Dashboard
@@ -62,7 +64,7 @@ async function initDashboard() {
 
 // 6. Recupero Categorie (per la select dei filtri)
 async function fetchCategorie() {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('categorie')
         .select('id_categoria, nome_categoria')
         .order('nome_categoria');
@@ -86,7 +88,7 @@ async function fetchCategorie() {
 async function fetchOrdini() {
     tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Caricamento in corso...</td></tr>';
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('ordini_testata')
         .select(`
             id_ordine,
@@ -120,10 +122,7 @@ function renderTabella(ordini) {
     }
 
     ordini.forEach(ordine => {
-        // Formatta la data (es. GG/MM/AAAA)
         const dataFormattata = new Date(ordine.data_ordine).toLocaleDateString('it-IT');
-        
-        // Estrazione sicura dei dati relazionali
         const clienteNome = ordine.clienti ? ordine.clienti.ragione_sociale : 'Cliente sconosciuto';
         const bottegaNome = ordine.botteghe ? ordine.botteghe.nome_bottega : 'Bottega sconosciuta';
         const categoriaNome = ordine.categorie ? ordine.categorie.nome_categoria : 'Categoria sconosciuta';
@@ -135,7 +134,7 @@ function renderTabella(ordini) {
             <td><strong>${clienteNome}</strong></td>
             <td>${bottegaNome}</td>
             <td><span class="badge bg-secondary">${categoriaNome}</span></td>
-            <td>-</td> <!-- Implementeremo il conteggio o l'export dei dettagli -->
+            <td>-</td>
             <td><span class="badge bg-warning text-dark">Da processare</span></td>
         `;
         tableBody.appendChild(tr);
@@ -147,7 +146,7 @@ filterCategoria.addEventListener('change', (e) => {
     const categoriaSelezionata = e.target.value;
     
     if (categoriaSelezionata === "") {
-        renderTabella(ordiniCorrenti); // Mostra tutti
+        renderTabella(ordiniCorrenti);
     } else {
         const ordiniFiltrati = ordiniCorrenti.filter(o => String(o.id_categoria) === String(categoriaSelezionata));
         renderTabella(ordiniFiltrati);
