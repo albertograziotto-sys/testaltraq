@@ -1,6 +1,6 @@
 // 1. Configurazione Supabase
-const SUPABASE_URL = 'INSERISCI_IL_TUO_URL';
-const SUPABASE_ANON_KEY = 'INSERISCI_LA_TUA_CHIAVE_ANONIMA';
+const SUPABASE_URL = 'https://tmaxqbosibkxrghgwfzi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 2. Riferimenti alla UI
