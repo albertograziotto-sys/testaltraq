@@ -1247,15 +1247,52 @@
         const grandTotale = document.getElementById('cart-total-bar').innerHTML;
         html += `
         <div class="col-12 text-end mt-4 bg-white p-4 rounded shadow-sm border border-secondary-subtle">
-            <h3 class="fw-bold mb-3 text-dark">Totale Generale da confermare: <span class="text-brand">${grandTotale}</span></h3>
-            ${tuttoSuperato 
-                ? `<button class="btn btn-success btn-lg fw-bold px-5 shadow-sm" onclick="inviaOrdineDefinitivo()">✅ Conferma e Invia Ordine</button>`
-                : `<button class="btn btn-secondary btn-lg fw-bold px-5" disabled>Raggiungi i minimi per poter inviare</button>
-                   <p class="text-danger mt-2 fw-bold small">Attenzione: risolvi le categorie segnate in rosso per procedere.</p>`
-            }
+            <h3 class="fw-bold mb-3 text-dark">Totale Generale da confermare: <span class="text-brand">${grandTotale}</span></h3>`;
+            
+        if (tuttoSuperato) {
+            html += `<button id="btn-conferma-ordine" class="btn btn-success btn-lg fw-bold px-5 shadow-sm" onclick="inviaOrdineDefinitivo()">✅ Conferma e Invia Ordine</button>`;
+        } else {
+            html += `
+            <div class="d-inline-block text-start mb-3 p-3 bg-light border border-warning rounded">
+                <div class="form-check">
+                    <input class="form-check-input border-warning" type="checkbox" id="force-submit-checkbox" onchange="toggleForzaInvio()" style="cursor: pointer;">
+                    <label class="form-check-label fw-bold text-dark" for="force-submit-checkbox" style="cursor: pointer;">
+                        Sono consapevole di non aver raggiunto il minimo in alcune categorie,<br>ma richiedo comunque l'invio dell'ordine.
+                    </label>
+                </div>
+            </div>
+            <br>
+            <button id="btn-conferma-ordine" class="btn btn-secondary btn-lg fw-bold px-5" disabled onclick="inviaOrdineDefinitivo()">Raggiungi i minimi per poter inviare</button>
+            <p id="msg-errore-minimi" class="text-danger mt-2 fw-bold small">Attenzione: risolvi le categorie segnate in rosso o spunta la casella per forzare l'invio.</p>
+            `;
+        }
+
+        html += `
         </div></div>`;
 
         app.innerHTML = html;
+    }
+
+    function toggleForzaInvio() {
+        const isChecked = document.getElementById('force-submit-checkbox').checked;
+        const btn = document.getElementById('btn-conferma-ordine');
+        const msgErrore = document.getElementById('msg-errore-minimi');
+        
+        if (isChecked) {
+            // Sblocca il pulsante e lo colora di arancione/warning
+            btn.disabled = false;
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-warning', 'text-dark', 'shadow-sm');
+            btn.innerHTML = '⚠️ Conferma e Invia Sotto Minimo';
+            if(msgErrore) msgErrore.style.display = 'none';
+        } else {
+            // Blocca di nuovo il pulsante se l'utente toglie la spunta
+            btn.disabled = true;
+            btn.classList.remove('btn-warning', 'text-dark', 'shadow-sm');
+            btn.classList.add('btn-secondary');
+            btn.innerHTML = 'Raggiungi i minimi per poter inviare';
+            if(msgErrore) msgErrore.style.display = 'block';
+        }
     }
 
     async function inviaOrdineDefinitivo() {
