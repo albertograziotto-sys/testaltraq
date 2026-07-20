@@ -16,10 +16,10 @@ const searchCliente = document.getElementById('search-cliente');
 
 let ordiniCorrenti = [];
 
-// 3. Gestore dello Stato di Autenticazione con blocco dei Clienti B2B
+// 3. Gestore dello Stato di Autenticazione con controllo per blocco Clienti B2B
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
-        // Verifica di sicurezza: se l'utente esiste nella tabella "clienti", è un cliente e NON uno staff Admin!
+        // Verifica se l'utente è un Cliente B2B
         const { data: cliente } = await supabaseClient
             .from('clienti')
             .select('id')
@@ -27,14 +27,12 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
             .maybeSingle();
 
         if (cliente) {
-            // È un account cliente: effettua subito il logout e nega l'accesso
             await supabaseClient.auth.signOut();
             loginError.textContent = "Accesso Negato: Questo account appartiene a un cliente B2B. Utilizza il portale principale.";
             loginError.classList.remove('d-none');
             return;
         }
 
-        // È un utente Staff
         loginError.classList.add('d-none');
         loginSection.classList.add('d-none');
         dashboardSection.classList.remove('d-none');
@@ -159,10 +157,8 @@ function applicaFiltri() {
 
     const ordiniFiltrati = ordiniCorrenti.filter(ordine => {
         const coincideCategoria = catSelezionata === "" || String(ordine.id_categoria) === String(catSelezionata);
-        
         const ragioneSociale = ordine.clienti?.ragione_sociale?.toLowerCase() || '';
         const nomeBottega = ordine.botteghe?.nome_bottega?.toLowerCase() || '';
-        
         const coincideRicerca = queryStr === "" || ragioneSociale.includes(queryStr) || nomeBottega.includes(queryStr);
 
         return coincideCategoria && coincideRicerca;
@@ -213,7 +209,7 @@ document.getElementById('btn-mark-downloaded').addEventListener('click', async (
     btn.disabled = false;
 });
 
-// 12. Azione: Esporta in CSV
+// 12. Azione: Esporta Dettaglio Botteghe (CSV Analitico)
 document.getElementById('btn-export-csv').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.order-checkbox:checked');
     const ordiniSelezionatiIDs = Array.from(checkboxes).map(cb => cb.value);
@@ -233,15 +229,8 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
         .select('*')
         .in('id_ordine', ordiniSelezionatiIDs);
 
-    if (error) {
-        alert("Errore durante il recupero dei dettagli: " + error.message);
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        return;
-    }
-
-    if (!dettagli || dettagli.length === 0) {
-        alert("Nessun articolo/dettaglio trovato per gli ordini selezionati.");
+    if (error || !dettagli || dettagli.length === 0) {
+        alert("Errore o nessun articolo trovato per gli ordini selezionati.");
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
@@ -250,11 +239,8 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
     let csvContent = "\uFEFF"; 
     csvContent += "ID Ordine;Data;Cliente;Bottega;Categoria;Codice Articolo;Quantità;Prezzo Unitario;Totale Riga\n";
 
-    let righeAggiunte = 0;
-
     dettagli.forEach(dettaglio => {
         const testata = ordiniCorrenti.find(o => String(o.id_ordine) === String(dettaglio.id_ordine));
-        
         if (testata) {
             const dataOrdine = testata.data_ordine ? new Date(testata.data_ordine).toLocaleDateString('it-IT') : '';
             const cliente = testata.clienti ? String(testata.clienti.ragione_sociale).replace(/;/g, ',') : '';
@@ -267,26 +253,84 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
             const prezzoUnitario = Number(prezzo).toFixed(2);
 
             csvContent += `${dettaglio.id_ordine};${dataOrdine};"${cliente}";"${bottega}";"${categoria}";"${dettaglio.codice_articolo}";${qta};${prezzoUnitario};${totaleRiga}\n`;
-            righeAggiunte++;
         }
     });
 
-    if (righeAggiunte === 0) {
-        alert("Impossibile associare gli articoli agli ordini selezionati.");
+    scaricaFileCSV(csvContent, `dettaglio_botteghe_${new Date().toISOString().split('T')[0]}.csv`);
+
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+});
+
+// 13. NUOVA AZIONE: Esporta Totali Fornitore (CSV Aggregato per Codice Articolo)
+document.getElementById('btn-export-summary').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const ordiniSelezionatiIDs = Array.from(checkboxes).map(cb => cb.value);
+
+    if (ordiniSelezionatiIDs.length === 0) {
+        alert("Seleziona gli ordini di cui vuoi calcolare i totali per il fornitore.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-export-summary');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calcolo...';
+    btn.disabled = true;
+
+    const { data: dettagli, error } = await supabaseClient
+        .from('ordini_dettaglio')
+        .select('*')
+        .in('id_ordine', ordiniSelezionatiIDs);
+
+    if (error || !dettagli || dettagli.length === 0) {
+        alert("Errore o nessun articolo trovato per gli ordini selezionati.");
         btn.innerHTML = originalText;
         btn.disabled = false;
         return;
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `esportazione_ordini_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Mappa di aggregazione: { "COD_ARTICOLO": { quantitaTotale, prezzoUnitario } }
+    const riassuntoArticoli = {};
+
+    dettagli.forEach(dettaglio => {
+        const cod = dettaglio.codice_articolo;
+        const qta = Number(dettaglio.quantita) || 0;
+        const prezzo = Number(dettaglio.prezzo_unitario_applicato) || 0;
+
+        if (!riassuntoArticoli[cod]) {
+            riassuntoArticoli[cod] = {
+                codice: cod,
+                quantitaTotale: 0,
+                prezzoUnitario: prezzo
+            };
+        }
+        riassuntoArticoli[cod].quantitaTotale += qta;
+    });
+
+    // Costruzione CSV Aggregato
+    let csvContent = "\uFEFF"; 
+    csvContent += "Codice Articolo;Quantità Totale Ordinata;Prezzo Unitario Applicato;Importo Totale Estimativo\n";
+
+    Object.values(riassuntoArticoli).forEach(item => {
+        const totaleEuro = (item.quantitaTotale * item.prezzoUnitario).toFixed(2);
+        const prezzoUnit = item.prezzoUnitario.toFixed(2);
+        csvContent += `"${item.codice}";${item.quantitaTotale};${prezzoUnit};${totaleEuro}\n`;
+    });
+
+    scaricaFileCSV(csvContent, `totali_fornitore_${new Date().toISOString().split('T')[0]}.csv`);
 
     btn.innerHTML = originalText;
     btn.disabled = false;
 });
+
+// Helper per il download dei file CSV
+function scaricaFileCSV(contenuto, nomeFile) {
+    const blob = new Blob([contenuto], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", nomeFile);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
