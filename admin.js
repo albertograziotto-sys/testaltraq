@@ -152,3 +152,48 @@ filterCategoria.addEventListener('change', (e) => {
         renderTabella(ordiniFiltrati);
     }
 });
+// 10. Gestione Checkbox "Seleziona Tutti"
+document.getElementById('select-all').addEventListener('change', (e) => {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => cb.checked = e.target.checked);
+});
+
+// 11. Azione: Segna come Presi in Carico
+document.getElementById('btn-mark-downloaded').addEventListener('click', async () => {
+    // Raccoglie tutti gli ID degli ordini selezionati
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const ordiniSelezionati = Array.from(checkboxes).map(cb => cb.value);
+
+    if (ordiniSelezionati.length === 0) {
+        alert("Seleziona almeno un ordine da prendere in carico.");
+        return;
+    }
+
+    const conferma = confirm(`Stai per segnare ${ordiniSelezionati.length} ordini come presi in carico. Procedere?`);
+    if (!conferma) return;
+
+    // Cambia il testo del bottone per dare feedback visivo
+    const btn = document.getElementById('btn-mark-downloaded');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aggiornamento...';
+    btn.disabled = true;
+
+    // Esegue l'aggiornamento multiplo su Supabase usando .in()
+    const { error } = await supabaseClient
+        .from('ordini_testata')
+        .update({ flag_scaricato: true })
+        .in('id_ordine', ordiniSelezionati);
+
+    if (error) {
+        console.error("Errore durante l'aggiornamento:", error);
+        alert("Errore durante l'aggiornamento: " + error.message);
+    } else {
+        // Deseleziona il checkbox principale e ricarica la tabella
+        document.getElementById('select-all').checked = false;
+        await fetchOrdini(); 
+    }
+
+    // Ripristina il bottone
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+});
