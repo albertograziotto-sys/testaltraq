@@ -10,44 +10,8 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
-    <style>
-        :root {
-            --altraq-brand: #f56f11;
-            --altraq-hover: #d45e0d;
-        }
-
-        body { 
-            background-color: #f8f9fa; 
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-        
-        .d-none { display: none !important; }
-
-        /* Classi utility Brand AltraQualità */
-        .brand-bg-color {
-            background-color: var(--altraq-brand) !important;
-        }
-
-        .text-brand {
-            color: var(--altraq-brand) !important;
-        }
-
-        .btn-brand {
-            background-color: var(--altraq-brand);
-            color: white;
-            border: none;
-        }
-
-        .btn-brand:hover {
-            background-color: var(--altraq-hover);
-            color: white;
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: var(--altraq-brand);
-            box-shadow: 0 0 0 0.25rem rgba(245, 111, 17, 0.25);
-        }
-    </style>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/admin-style.css">
 </head>
 <body>
 
@@ -64,7 +28,7 @@
 
     <div class="container">
         
-        <!-- SEZIONE 1: LOGIN -->
+        <!-- SEZIONE 1: LOGIN STAFF -->
         <div id="login-section" class="row justify-content-center">
             <div class="col-md-5">
                 <div class="card shadow-sm mt-5 border-0">
@@ -87,7 +51,7 @@
             </div>
         </div>
 
-        <!-- SEZIONE 2: DASHBOARD ORDINI -->
+        <!-- SEZIONE 2: DASHBOARD ORDINI IN INGRESSO -->
         <div id="dashboard-section" class="d-none">
             
             <!-- Header Dashboard & Filtri -->
@@ -140,7 +104,7 @@
                                 </tr>
                             </thead>
                             <tbody id="orders-table-body">
-                                <!-- Popolato dinamicamente da admin.js -->
+                                <!-- Popolato dinamicamente da table.js -->
                             </tbody>
                         </table>
                     </div>
@@ -151,10 +115,10 @@
 
     </div>
 
-    <!-- Supabase JS -->
+    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- Custom Logic -->
-    <script src="admin.js"></script>
+    <!-- Entry Point Javascript ES Module -->
+    <script type="module" src="js/admin-app.js"></script>
 </body>
 </html>
