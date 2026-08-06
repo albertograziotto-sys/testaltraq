@@ -1,74 +1,109 @@
-// Inizializzazione Supabase
-const SUPABASE_URL = 'https://tmaxqbosibkxrghgwfzi.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXhxYm9zaWJreHJnaGd3ZnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODA2MjUsImV4cCI6MjA5OTk1NjYyNX0.xMVQd7yHyUuoCyH1JajJttYRNR5qhEy_W6TsMcDgJA0';
+import { clientDB } from './config.js';
+import { AppState } from './state.js';
+import { eseguiLogin, eseguiRegistrazione, eseguiRecuperoPassword, salvaNuovaPassword, eseguiLogout, togglePassword } from './auth.js';
+import { caricaBotteghe, cambiaBottegaAttiva, aggiungiBottega, eliminaBottega, salvaModificaBottega } from './botteghe.js';
+import { caricaCampagne, apriCampagna, apriCategoria, apriGalleria, gestisciErroreFoto } from './catalog.js';
+import { modificaQtaGriglia, modificaQtaModal, applicaQtaDalBottone, applicaQtaDalModal, modificaQtaDalCarrello, rimuoviDalCarrello } from './cart.js';
+import { mostraRiepilogoCarrello, toggleForzaInvio, inviaOrdineDefinitivo } from './checkout.js';
+import { caricaStoricoOrdini } from './orders.js';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export function cambiaVista(vistaID) {
+  ['login-section', 'register-section', 'forgot-password-section', 'dashboard-wrapper', 'main-navbar', 'cart-sticky-bar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  if (vistaID === 'login-section' || vistaID === 'register-section' || vistaID === 'forgot-password-section') {
+    document.getElementById(vistaID).style.display = 'flex';
+  } else {
+    document.getElementById('main-navbar').style.display = 'flex';
+    document.getElementById('dashboard-wrapper').style.display = 'block';
+    navigaA(vistaID);
+  }
+}
 
-// Stato globale della SPA
-const AppState = {
-    user: null,
-    botteghe: [],
-    bottegaAttiva: null,
-    carrelli: {} 
-};
+export function navigaA(sezione) {
+  ['app-section', 'orders-section', 'checkout-section', 'profile-section'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById(sezione).style.display = 'block';
+  
+  document.getElementById('cart-sticky-bar').style.display = (sezione === 'app-section') ? 'flex' : 'none';
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("App inizializzata. Connessione a Supabase stabilita.");
-    // Prossimo step: Check sessione e Auth
+  document.querySelectorAll('.sidebar-menu button').forEach(b => {
+    b.classList.remove('active', 'fw-bold'); 
+    b.classList.add('text-secondary', 'fw-semibold');
+  });
+
+  if (sezione === 'app-section') {
+    document.getElementById('nav-fornitori').classList.add('active', 'fw-bold');
+  }
+  if (sezione === 'orders-section') {
+    document.getElementById('nav-ordini').classList.add('active', 'fw-bold');
+    caricaStoricoOrdini();
+  }
+  if (sezione === 'profile-section') {
+    document.getElementById('nav-profilo').classList.add('active', 'fw-bold');
+  }
+
+  const offcanvasMenu = document.getElementById('sidebarMenu');
+  if (offcanvasMenu && window.innerWidth < 768) {
+    const bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasMenu);
+    if (bsOffcanvas) bsOffcanvas.hide();
+  }
+}
+
+export async function inizializzaDashboard() {
+  document.getElementById('nome-cliente-display').innerText = AppState.user.ragione_sociale;
+  document.getElementById('prof-ragione').value = AppState.user.ragione_sociale || ''; 
+  document.getElementById('prof-email').value = AppState.user.email || '';
+  
+  const { data: tutteLeCategorie } = await clientDB.from('categorie').select('*').order('nome_categoria');
+  if (tutteLeCategorie) AppState.categorieCache = tutteLeCategorie;
+
+  cambiaVista('app-section');
+  await caricaBotteghe();
+}
+
+// Esposizione funzioni su window per la compatibilità con gli attributi HTML (onclick, onchange, onerror)
+Object.assign(window, {
+  cambiaVista,
+  navigaA,
+  togglePassword,
+  eseguiLogin,
+  eseguiRegistrazione,
+  eseguiRecuperoPassword,
+  salvaNuovaPassword,
+  eseguiLogout,
+  cambiaBottegaAttiva,
+  aggiungiBottega,
+  eliminaBottega,
+  salvaModificaBottega,
+  caricaCampagne,
+  apriCampagna,
+  apriCategoria,
+  apriGalleria,
+  gestisciErroreFoto,
+  modificaQtaGriglia,
+  modificaQtaModal,
+  applicaQtaDalBottone,
+  applicaQtaDalModal,
+  modificaQtaDalCarrello,
+  rimuoviDalCarrello,
+  mostraRiepilogoCarrello,
+  toggleForzaInvio,
+  inviaOrdineDefinitivo,
+  caricaStoricoOrdini
 });
-// Aggiungiamo lo stato al nostro AppState
-AppState.fornitori = [];
 
-async function caricaFornitori() {
-    const app = document.getElementById('app');
-    app.innerHTML = '<div class="spinner-border text-brand mx-auto mt-5"></div>';
-
-    // Peschiamo i fornitori dal DB
-    const { data: fornitori, error } = await clientDB.from('fornitori').select('*').order('nome');
-    
-    if (error) {
-        app.innerHTML = `<p class="text-danger fw-bold mt-4">Errore caricamento fornitori.</p>`;
-        return;
+// Event Listener di avvio
+window.addEventListener('DOMContentLoaded', async () => {
+  const { data: { session } } = await clientDB.auth.getSession();
+  if (session) {
+    const { data: clienteData } = await clientDB.from('clienti').select('*').eq('id', session.user.id).single();
+    if (clienteData) {
+      AppState.user = clienteData;
+      if (clienteData.carrello_bozza) {
+        AppState.carrello = clienteData.carrello_bozza;
+      }
+      inizializzaDashboard();
     }
-
-    AppState.fornitori = fornitori;
-    disegnaVetrinaFornitori();
-}
-
-function disegnaVetrinaFornitori() {
-    const app = document.getElementById('app');
-    let html = `<div class="col-12 mb-4 text-start">
-                    <h3 class="fw-bold text-brand">I Nostri Fornitori</h3>
-                    <p class="text-muted">Seleziona un fornitore per visualizzare il catalogo e iniziare l'ordine.</p>
-                </div>`;
-
-    AppState.fornitori.forEach(f => {
-        html += `
-        <div class="col-md-6 col-lg-4 mb-4 text-start">
-            <div class="card shadow-sm h-100 border-0" style="border-top: 5px solid var(--brand) !important; cursor: pointer; transition: transform 0.2s;" onclick="apriCatalogoFornitore('${f.nome}')" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
-                <div class="card-body p-4 d-flex flex-column">
-                    <h4 class="fw-bold text-dark mb-3">${f.nome}</h4>
-                    <div class="mt-auto p-3 bg-light rounded border border-secondary-subtle">
-                        <span class="text-muted small fw-bold d-block mb-1">Minimo d'ordine richiesto:</span>
-                        <h5 class="text-brand fw-bold mb-0">€ ${f.minimo_ordine.toFixed(2).replace('.', ',')}</h5>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    });
-
-    app.innerHTML = html;
-}
-
-function apriCatalogoFornitore(nomeFornitore) {
-    // Verifica se l'utente ha selezionato una bottega prima di farlo comprare
-    const bottegaSelezionata = document.getElementById('global-bottega-selector').value;
-    if(!bottegaSelezionata) {
-        alert("Prima di iniziare gli acquisti, seleziona una bottega dal menu in alto!");
-        return;
-    }
-    
-    console.log("Apro catalogo per: ", nomeFornitore);
-    // Qui chiameremo la funzione che fa la query su 'prodotti' filtrando per fornitore
-    // E disegnerà la griglia dei prodotti con i pulsanti "Aggiungi"
-}
+  }
+});
