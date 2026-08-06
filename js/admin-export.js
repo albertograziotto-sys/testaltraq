@@ -32,6 +32,7 @@ export async function esportaDettaglioBotteghe() {
     .in('id_ordine', ordiniSelezionatiIDs);
 
   if (error || !dettagli || dettagli.length === 0) {
+    console.error("Errore esportazione dettaglio:", error);
     alert("Errore o nessun articolo trovato per gli ordini selezionati.");
     btn.innerHTML = originalText;
     btn.disabled = false;
@@ -45,9 +46,14 @@ export async function esportaDettaglioBotteghe() {
     const testata = AdminState.ordiniCorrenti.find(o => String(o.id_ordine) === String(dettaglio.id_ordine));
     if (testata) {
       const dataOrdine = testata.data_ordine ? new Date(testata.data_ordine).toLocaleDateString('it-IT') : '';
-      const cliente = testata.clienti ? String(testata.clienti.ragione_sociale).replace(/;/g, ',') : '';
-      const bottega = testata.botteghe ? String(testata.botteghe.nome_bottega).replace(/;/g, ',') : '';
-      const categoria = testata.categorie ? String(testata.categorie.nome_categoria).replace(/;/g, ',') : '';
+      
+      const clienteObj = Array.isArray(testata.clienti) ? testata.clienti[0] : testata.clienti;
+      const bottegaObj = Array.isArray(testata.botteghe) ? testata.botteghe[0] : testata.botteghe;
+      const categoriaObj = Array.isArray(testata.categorie) ? testata.categorie[0] : testata.categorie;
+
+      const cliente = clienteObj?.ragione_sociale ? String(clienteObj.ragione_sociale).replace(/;/g, ',') : '';
+      const bottega = bottegaObj?.nome_bottega ? String(bottegaObj.nome_bottega).replace(/;/g, ',') : '';
+      const categoria = categoriaObj?.nome_categoria ? String(categoriaObj.nome_categoria).replace(/;/g, ',') : '';
       
       const qta = dettaglio.quantita || 0;
       const prezzo = dettaglio.prezzo_unitario_applicato || 0;
@@ -84,6 +90,7 @@ export async function esportaTotaliFornitore() {
     .in('id_ordine', ordiniSelezionatiIDs);
 
   if (error || !dettagli || dettagli.length === 0) {
+    console.error("Errore esportazione totali:", error);
     alert("Errore o nessun articolo trovato per gli ordini selezionati.");
     btn.innerHTML = originalText;
     btn.disabled = false;
