@@ -1,13 +1,11 @@
-import { inizializzaAuth, eseguiLogin, eseguiLogout } from './auth.js';
-import { applicaFiltri } from './filters.js';
-import { segnaComePresiInCarico } from './table.js';
-import { esportaDettaglioBotteghe, esportaTotaliFornitore } from './export.js';
+import { inizializzaAuth, eseguiLogin, eseguiLogout } from './admin-auth.js';
+import { applicaFiltri } from './admin-filters.js';
+import { segnaComePresiInCarico } from './admin-table.js';
+import { esportaDettaglioBotteghe, esportaTotaliFornitore } from './admin-export.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Inizializza il listener dello stato Auth
   inizializzaAuth();
 
-  // Form di Login Staff
   const loginForm = document.getElementById('login-form');
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
@@ -18,19 +16,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Pulsante Logout
   const btnLogout = document.getElementById('btn-logout');
   if (btnLogout) {
     btnLogout.addEventListener('click', eseguiLogout);
   }
 
-  // Filtri ricerca e modulo
   const filterCategoria = document.getElementById('filter-categoria');
   const searchCliente = document.getElementById('search-cliente');
   if (filterCategoria) filterCategoria.addEventListener('change', applicaFiltri);
   if (searchCliente) searchCliente.addEventListener('input', applicaFiltri);
 
-  // Checkbox Seleziona Tutti
   const selectAll = document.getElementById('select-all');
   if (selectAll) {
     selectAll.addEventListener('change', (e) => {
@@ -39,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Azioni pulsanti Dashboard
   const btnMarkDownloaded = document.getElementById('btn-mark-downloaded');
   if (btnMarkDownloaded) btnMarkDownloaded.addEventListener('click', segnaComePresiInCarico);
 
